@@ -270,7 +270,7 @@ def get_matchups(league, week=None):
                                               i.away_team.wins, i.away_team.losses, i.away_team.team_abbrev) for i in matchups
                if i.away_team]
 
-    text = ['Matchups'] + full_names + [''] + abbrevs
+    text = ['SET YOUR WEEKLY PICKEMS BEFORE THE START OF THE THURSDAY NIGHT GAME \nMatchups'] + full_names + [''] + abbrevs
     return '\n'.join(text)
 
 
