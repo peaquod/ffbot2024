@@ -33,9 +33,10 @@ def set_owner_names(league) -> None:
     Gives every team in the league an ``owner_name`` used in all bot messages.
 
     Uses the owner's first name. If two owners share a first name, their last
-    initial is added (e.g. "Mike S"). Teams with more than one owner are called
-    CO_OWNED_TEAM_NAME. Teams with no owner name from ESPN keep using their
-    team abbreviation.
+    initial is added (e.g. "Mike S"). The first team with more than one owner is
+    called CO_OWNED_TEAM_NAME; any other co-owned team uses its owners' first
+    names joined with "&" (e.g. "Ann & Bob"). Teams with no owner name from
+    ESPN keep using their team abbreviation.
     """
     names = []
     for team in league.teams:
@@ -43,16 +44,21 @@ def set_owner_names(league) -> None:
         owner = owners[0] if owners else {}
         first = (owner.get('firstName') or '').strip().title()
         last = (owner.get('lastName') or '').strip().title()
-        names.append((team, first, last, len(owners) > 1))
+        co_owner_firsts = [(o.get('firstName') or '').strip().title() for o in owners]
+        names.append((team, first, last, len(owners) > 1, co_owner_firsts))
 
     counts = {}
-    for _, first, _, co_owned in names:
+    for _, first, _, co_owned, _ in names:
         if first and not co_owned:
             counts[first] = counts.get(first, 0) + 1
 
-    for team, first, last, co_owned in names:
-        if co_owned:
+    curry_tamale_used = False
+    for team, first, last, co_owned, co_owner_firsts in names:
+        if co_owned and not curry_tamale_used:
             name = CO_OWNED_TEAM_NAME
+            curry_tamale_used = True
+        elif co_owned:
+            name = ' & '.join(n for n in co_owner_firsts if n) or team.team_abbrev
         elif not first:
             name = team.team_abbrev
         elif counts[first] > 1 and last:
