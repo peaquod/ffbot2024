@@ -6,6 +6,10 @@ post twice: once for daylight time and once for standard time. Every run works o
 which post it was started for by converting its scheduled time back to the post's
 timezone, so the copy that doesn't match the current clock does nothing.
 
+GitHub often starts scheduled runs late, especially near the top of the hour, and
+sometimes drops them. So each run is scheduled LEAD_MINUTES early, at a quieter
+minute, and waits until the post time before posting.
+
 Usage:
     python -m gamedaybot.espn.github_actions "<cron string>"     # from a schedule
     python -m gamedaybot.espn.github_actions --run <function>     # run one message now
@@ -13,6 +17,7 @@ Usage:
 """
 import os
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -23,6 +28,11 @@ sys.path.insert(1, os.path.abspath('.'))
 LOCAL_TIMEZONE = 'America/Winnipeg'
 # NFL game times are always US Eastern.
 GAME_TIMEZONE = 'America/New_York'
+
+# How early each GitHub run is scheduled before its post time.
+LEAD_MINUTES = 20
+# A run that starts this long after its post time is skipped rather than posting stale news.
+MAX_LATE = timedelta(hours=2)
 
 DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
@@ -45,7 +55,7 @@ def _cron_dow(day_index):
 def generate_crons(year=None):
     """
     Returns every UTC cron string needed to cover all SLOTS in both daylight and
-    standard time.
+    standard time, each LEAD_MINUTES before its post time.
     """
     year = year or datetime.now(timezone.utc).year
     crons = set()
@@ -56,7 +66,7 @@ def generate_crons(year=None):
             for day in days:
                 local = (sample + timedelta(days=DAYS.index(day))).replace(
                     hour=hour, minute=minute, tzinfo=ZoneInfo(tz))
-                utc = local.astimezone(timezone.utc)
+                utc = local.astimezone(timezone.utc) - timedelta(minutes=LEAD_MINUTES)
                 crons.add((utc.minute, utc.hour, _cron_dow(utc.weekday())))
 
     # Merge entries that differ only by weekday to keep the workflow short.
@@ -81,6 +91,11 @@ def scheduled_time(cron, now=None):
         if candidate <= now and _cron_dow(candidate.weekday()) in dows:
             return candidate
     raise ValueError(f'Could not work out the scheduled time for "{cron}"')
+
+
+def post_time(cron, now=None):
+    """Returns the UTC time a GitHub schedule run should post at."""
+    return scheduled_time(cron, now) + timedelta(minutes=LEAD_MINUTES)
 
 
 def functions_due(when_utc):
@@ -111,13 +126,19 @@ def main(argv):
     if len(argv) == 3 and argv[1] == '--run':
         functions = [argv[2]]
     elif len(argv) == 2:
-        when = scheduled_time(argv[1])
+        when = post_time(argv[1])
         functions = functions_due(when)
-        print(f'Scheduled for {when.astimezone(ZoneInfo(LOCAL_TIMEZONE)):%a %Y-%m-%d %H:%M %Z}: '
+        print(f'Posting at {when.astimezone(ZoneInfo(LOCAL_TIMEZONE)):%a %Y-%m-%d %H:%M %Z}: '
               f'{", ".join(functions) or "nothing (other daylight-saving copy)"}')
+        if not functions:
+            return
+        late = datetime.now(timezone.utc) - when
+        if late > MAX_LATE:
+            print(f'GitHub started this run {late} late; skipping so old news is not posted.')
+            return
 
         data = get_env_vars()
-        if functions and not util.currently_in_season(data['ff_start_date'], data['ff_end_date']):
+        if not util.currently_in_season(data['ff_start_date'], data['ff_end_date']):
             print('Not in season, skipping.')
             return
         functions = [f for f in functions
@@ -126,6 +147,11 @@ def main(argv):
         # The waiver report needs SWID and ESPN_S2; without them the bot posts an error.
         if data['swid'] == '{1}' or data['espn_s2'] == '1':
             functions = [f for f in functions if f != 'get_waiver_report']
+
+        wait = (when - datetime.now(timezone.utc)).total_seconds()
+        if functions and wait > 0:
+            print(f'Waiting {wait / 60:.1f} minutes until post time')
+            time.sleep(wait)
     else:
         print(__doc__)
         sys.exit(2)

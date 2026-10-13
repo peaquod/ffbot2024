@@ -4,21 +4,23 @@ name: Scheduled messages
 # gamedaybot/espn/github_actions.py (Central time for most posts, Eastern for game-time posts).
 # GitHub schedules in UTC, so each post appears twice below, once for daylight time and once
 # for standard time; the copy that doesn't match the current clock does nothing.
+# Each run starts 20 minutes early, because GitHub often runs schedules late, and waits
+# until the post time.
 # If you change the schedule there, regenerate this list with:
 #   python -m gamedaybot.espn.github_actions --print-crons
 
 on:
   schedule:
-    - cron: '0 17 * * 2'
-    - cron: '0 18 * * 2'
-    - cron: '30 0 * * 3'
-    - cron: '30 12 * * 3'
-    - cron: '30 13 * * 3'
-    - cron: '30 21 * * 4'
-    - cron: '30 22 * * 4'
-    - cron: '30 23 * * 2'
-    - cron: '31 12 * * 0,1,2,4,5,6'
-    - cron: '31 13 * * 0,1,2,4,5,6'
+    - cron: '10 0 * * 3'
+    - cron: '10 12 * * 3'
+    - cron: '10 13 * * 3'
+    - cron: '10 21 * * 4'
+    - cron: '10 22 * * 4'
+    - cron: '10 23 * * 2'
+    - cron: '11 12 * * 0,1,2,4,5,6'
+    - cron: '11 13 * * 0,1,2,4,5,6'
+    - cron: '40 16 * * 2'
+    - cron: '40 17 * * 2'
   workflow_dispatch:
     inputs:
       function:
@@ -41,7 +43,7 @@ on:
 jobs:
   post:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 45
     env:
       # Required (Settings > Secrets and variables > Actions > Secrets)
       BOT_ID: ${{ secrets.BOT_ID }}
