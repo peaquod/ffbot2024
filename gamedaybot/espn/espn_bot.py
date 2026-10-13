@@ -148,6 +148,8 @@ def espn_bot(function):
     else:
         league = League(league_id=league_id, year=year, espn_s2=espn_s2, swid=swid)
 
+    util.set_owner_names(league)
+
     try:
         broadcast_message = data['broadcast_message']
     except KeyError:

@@ -25,6 +25,41 @@ def str_to_bool(check: str) -> bool:
 
 
 
+def set_owner_names(league) -> None:
+    """
+    Gives every team in the league an ``owner_name`` used in all bot messages.
+
+    Uses the first listed owner's first name. If two owners share a first name,
+    their last initial is added (e.g. "Mike S"). Teams with no owner name from
+    ESPN keep using their team abbreviation.
+    """
+    names = []
+    for team in league.teams:
+        owner = team.owners[0] if getattr(team, 'owners', None) else {}
+        first = (owner.get('firstName') or '').strip().title()
+        last = (owner.get('lastName') or '').strip().title()
+        names.append((team, first, last))
+
+    counts = {}
+    for _, first, _ in names:
+        if first:
+            counts[first] = counts.get(first, 0) + 1
+
+    for team, first, last in names:
+        if not first:
+            name = team.team_abbrev
+        elif counts[first] > 1 and last:
+            name = f'{first} {last[0]}'
+        else:
+            name = first
+        team.owner_name = name
+
+
+def owner_name(team) -> str:
+    """Returns the owner's display name for a team, or its abbreviation if unknown."""
+    return getattr(team, 'owner_name', None) or team.team_abbrev
+
+
 def str_limit_check(text: str, limit: int) -> List[str]:
     """
     Splits a string into parts of a maximum length.

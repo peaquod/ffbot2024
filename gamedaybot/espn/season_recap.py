@@ -3,11 +3,13 @@ import os
 # import dataframe_image as dfi
 if os.environ.get("AWS_EXECUTION_ENV") is not None:
     import espn.functionality as espn
+    import utils.util as util
 else:
     # For local use
     import sys
     sys.path.insert(1, os.path.abspath('.'))
     import gamedaybot.espn.functionality as espn
+    import gamedaybot.utils.util as util
 
 
 def trophy_recap(league):
@@ -33,8 +35,8 @@ def trophy_recap(league):
 
     for team in league.teams:
         # Initialize trophy count for each team
-        team_trophies[team.team_abbrev] = [0 for i in range(len(ICONS))]
-        team_names.append(team.team_abbrev)
+        team_trophies[util.owner_name(team)] = [0 for i in range(len(ICONS))]
+        team_names.append(util.owner_name(team))
 
     for week in range(1, league.current_week):
         # Get high score, low score, blown out, and close win trophies
@@ -91,14 +93,14 @@ def win_matrix(league):
         A string of the standings in the format of "position. team abbreviation (wins-losses)"
     """
 
-    team_record = {team.team_abbrev: [0, 0] for team in league.teams}
+    team_record = {util.owner_name(team): [0, 0] for team in league.teams}
 
     for week in range(1, league.current_week):
         scores = espn.get_weekly_score_with_win_loss(league=league, week=week)
         losses = 0
         for team in scores:
-            team_record[team.team_abbrev][0] += len(scores) - 1 - losses
-            team_record[team.team_abbrev][1] += losses
+            team_record[util.owner_name(team)][0] += len(scores) - 1 - losses
+            team_record[util.owner_name(team)][1] += losses
             losses += 1
 
     team_record = dict(sorted(team_record.items(), key=lambda item: item[1][0] / item[1][1], reverse=True))

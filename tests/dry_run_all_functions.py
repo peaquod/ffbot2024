@@ -8,6 +8,7 @@ import gamedaybot.espn.functionality as espn
 from gamedaybot.chat.discord import Discord
 from gamedaybot.chat.slack import Slack
 from gamedaybot.chat.groupme import GroupMe
+from gamedaybot.utils import util
 
 # LEAGUE_ID = os.environ["LEAGUE_ID"]
 # LEAGUE_YEAR = os.environ["LEAGUE_YEAR"]
@@ -17,6 +18,7 @@ LEAGUE_ID = 164483
 LEAGUE_YEAR = 2026
 
 league = League(league_id=LEAGUE_ID, year=LEAGUE_YEAR)
+util.set_owner_names(league)
 print(espn.get_scoreboard_short(league))
 print(espn.get_projected_scoreboard(league))
 print(espn.get_standings(league))
@@ -41,6 +43,7 @@ except KeyError:
 
 if swid != '{1}' and espn_s2 != '1':
     league = League(league_id=LEAGUE_ID, year=LEAGUE_YEAR, espn_s2=espn_s2, swid=swid)
+    util.set_owner_names(league)
     print(espn.get_waiver_report(league))
     print(espn.get_waiver_report(league, True))
 
