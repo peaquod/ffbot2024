@@ -893,3 +893,203 @@ def get_trophies(league, week=None, recap=False):
     text = ['Trophies of the week:'] + high_score_str + low_score_str + blowout_str + close_score_str + \
         get_lucky_trophy(league, week) + get_achievers_trophy(league, week) + optimal_team_scores(league, week)
     return '\n'.join(text)
+
+
+def _completed_weeks(league):
+    """
+    Returns the number of finished regular-season weeks.
+
+    Parameters
+    ----------
+    league : object
+        The league object.
+
+    Returns
+    -------
+    int
+        How many regular-season weeks have been played.
+    """
+    return max(0, min(league.current_week - 1, league.settings.reg_season_count))
+
+
+def _weekly_results(league, weeks):
+    """
+    Builds each team's score, opponent score and result for every played week, skipping byes.
+
+    Parameters
+    ----------
+    league : object
+        The league object.
+    weeks : int
+        Number of weeks to include, starting from week 1.
+
+    Returns
+    -------
+    dict
+        {team: [(week_index, score, opponent_score), ...]}
+    """
+    results = {team: [] for team in league.teams}
+    for team in league.teams:
+        for w in range(weeks):
+            if w >= len(team.schedule) or w >= len(team.scores):
+                continue
+            opponent = team.schedule[w]
+            if opponent is team or opponent is None:
+                continue
+            score = team.scores[w]
+            opp_score = opponent.scores[w]
+            if score is None or opp_score is None:
+                continue
+            results[team].append((w, score, opp_score))
+    return results
+
+
+def _season_averages(results):
+    """Returns each team's average weekly score from the output of _weekly_results."""
+    return {team: (sum(s for _, s, _ in games) / len(games)) for team, games in results.items() if games}
+
+
+def get_luck_report(league):
+    """
+    Compares each team's actual record with its expected wins: how often its weekly score
+    would have beaten every other team that week. A big positive gap means a lucky schedule.
+
+    Parameters
+    ----------
+    league : object
+        The league object.
+
+    Returns
+    -------
+    str
+        The luck report, or an empty string before any games are played.
+    """
+    weeks = _completed_weeks(league)
+    if weeks < 1:
+        return ''
+    results = _weekly_results(league, weeks)
+
+    expected = {team: 0.0 for team in league.teams}
+    actual = {team: [0, 0, 0] for team in league.teams}
+    for w in range(weeks):
+        week_scores = [(team, s) for team, games in results.items() for gw, s, _ in games if gw == w]
+        if len(week_scores) < 2:
+            continue
+        for team, score in week_scores:
+            beat = sum(1 for other, s in week_scores if other is not team and s < score)
+            tied = sum(1 for other, s in week_scores if other is not team and s == score)
+            expected[team] += (beat + 0.5 * tied) / (len(week_scores) - 1)
+
+    for team, games in results.items():
+        for _, score, opp_score in games:
+            if score > opp_score:
+                actual[team][0] += 1
+            elif score < opp_score:
+                actual[team][1] += 1
+            else:
+                actual[team][2] += 1
+
+    rows = []
+    for team in league.teams:
+        wins, losses, ties = actual[team]
+        luck = round(wins + 0.5 * ties - expected[team], 1) or 0.0
+        rows.append((luck, team, wins, losses, ties))
+    rows.sort(key=lambda r: r[0], reverse=True)
+
+    text = [f'🍀 Luck Report (thru Wk {weeks})', 'Record vs expected wins']
+    for pos, (luck, team, wins, losses, ties) in enumerate(rows, start=1):
+        record = f'{wins}-{losses}' + (f'-{ties}' if ties else '')
+        emoji = ''
+        if pos == 1 and luck >= 1:
+            emoji = ' 🍀'
+        elif pos == len(rows) and luck <= -1:
+            emoji = ' 💀'
+        text.append(f'{pos}. {util.owner_name(team)} {record} (exp {expected[team]:.1f}) {luck:+.1f}{emoji}')
+    return '\n'.join(text)
+
+
+def get_strength_of_schedule(league):
+    """
+    Ranks teams by how tough their remaining regular-season opponents are, using each
+    opponent's season scoring average. Also shows how tough their schedule has been so far.
+
+    Parameters
+    ----------
+    league : object
+        The league object.
+
+    Returns
+    -------
+    str
+        The strength of schedule report, or an empty string if no regular-season games remain
+        or none have been played.
+    """
+    weeks = _completed_weeks(league)
+    reg_season = league.settings.reg_season_count
+    if weeks < 1 or weeks >= reg_season:
+        return ''
+    averages = _season_averages(_weekly_results(league, weeks))
+    if not averages:
+        return ''
+
+    rows = []
+    for team in league.teams:
+        played = [averages[team.schedule[w]] for w in range(min(weeks, len(team.schedule)))
+                  if team.schedule[w] is not team and team.schedule[w] in averages]
+        remaining = [averages[team.schedule[w]] for w in range(weeks, min(reg_season, len(team.schedule)))
+                     if team.schedule[w] is not team and team.schedule[w] in averages]
+        if not remaining:
+            continue
+        played_avg = sum(played) / len(played) if played else 0
+        rows.append((sum(remaining) / len(remaining), played_avg, team))
+    if not rows:
+        return ''
+    rows.sort(key=lambda r: r[0])
+
+    text = ['📅 Strength of Schedule', 'Remaining opp avg pts (easiest first)']
+    for pos, (remaining_avg, played_avg, team) in enumerate(rows, start=1):
+        emoji = ' 😬' if pos == len(rows) else ''
+        text.append(f'{pos}. {util.owner_name(team)} {remaining_avg:.1f} (so far {played_avg:.1f}){emoji}')
+    return '\n'.join(text)
+
+
+def get_form_report(league, recent_weeks=3, threshold=10):
+    """
+    Compares each team's average over the last few weeks with its season average.
+
+    Parameters
+    ----------
+    league : object
+        The league object.
+    recent_weeks : int, optional
+        How many recent weeks count as current form (default 3).
+    threshold : float, optional
+        Points above or below the season average to be marked hot or cold (default 10).
+
+    Returns
+    -------
+    str
+        The form report, or an empty string until there are more played weeks than recent_weeks.
+    """
+    weeks = _completed_weeks(league)
+    if weeks <= recent_weeks:
+        return ''
+    results = _weekly_results(league, weeks)
+
+    rows = []
+    for team, games in results.items():
+        if not games:
+            continue
+        season_avg = sum(s for _, s, _ in games) / len(games)
+        recent = [s for w, s, _ in games if w >= weeks - recent_weeks]
+        if not recent:
+            continue
+        recent_avg = sum(recent) / len(recent)
+        rows.append((recent_avg, round(recent_avg - season_avg, 1) or 0.0, team))
+    rows.sort(key=lambda r: r[0], reverse=True)
+
+    text = [f'🔥 Form: last {recent_weeks} wks vs season']
+    for recent_avg, diff, team in rows:
+        emoji = ' 🔥' if diff >= threshold else ' 🧊' if diff <= -threshold else ''
+        text.append(f'{util.owner_name(team)} {recent_avg:.1f} ({diff:+.1f}){emoji}')
+    return '\n'.join(text)

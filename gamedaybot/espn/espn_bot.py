@@ -181,6 +181,12 @@ def espn_bot(function):
         text = espn.get_trophies(league)
     elif function == "get_standings":
         text = espn.get_standings(league, top_half_scoring)
+    elif function == "get_luck_report":
+        text = espn.get_luck_report(league)
+    elif function == "get_form_report":
+        text = espn.get_form_report(league)
+    elif function == "get_strength_of_schedule":
+        text = espn.get_strength_of_schedule(league)
     elif function == "win_matrix":
         text = recap.win_matrix(league)
     elif function == "trophy_recap":

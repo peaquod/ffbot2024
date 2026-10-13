@@ -25,8 +25,11 @@ def scheduler():
     # close scores (within 15.99 points): monday evening at 6:30pm east coast time.
     # power rankings:                     tuesday evening at 6:30pm local time.
     # trophies:                           tuesday morning at 7:30am local time.
+    # luck report:                        tuesday morning at 7:35am local time.
+    # form report:                        tuesday morning at 7:36am local time.
     # standings:                          wednesday morning at 7:30am local time.
     # waiver report:                      wednesday morning at 7:31am local time. (optional)
+    # strength of schedule:               wednesday morning at 7:35am local time.
     # matchups:                           thursday evening at 7:30pm east coast time.
     # score update:                       friday, monday, and tuesday morning at 7:30am local time.
     # player monitor report:              sunday morning at 7:30am local time.
@@ -40,6 +43,15 @@ def scheduler():
                   timezone=my_timezone, replace_existing=True)
     sched.add_job(espn_bot, 'cron', ['get_final'], id='final',
                   day_of_week='tue', hour=7, minute=30, start_date=ff_start_date, end_date=ff_end_date,
+                  timezone=my_timezone, replace_existing=True)
+    sched.add_job(espn_bot, 'cron', ['get_luck_report'], id='luck_report',
+                  day_of_week='tue', hour=7, minute=35, start_date=ff_start_date, end_date=ff_end_date,
+                  timezone=my_timezone, replace_existing=True)
+    sched.add_job(espn_bot, 'cron', ['get_form_report'], id='form_report',
+                  day_of_week='tue', hour=7, minute=36, start_date=ff_start_date, end_date=ff_end_date,
+                  timezone=my_timezone, replace_existing=True)
+    sched.add_job(espn_bot, 'cron', ['get_strength_of_schedule'], id='strength_of_schedule',
+                  day_of_week='wed', hour=7, minute=35, start_date=ff_start_date, end_date=ff_end_date,
                   timezone=my_timezone, replace_existing=True)
     sched.add_job(espn_bot, 'cron', ['get_standings'], id='standings',
                   day_of_week='wed', hour=7, minute=30, start_date=ff_start_date, end_date=ff_end_date,
