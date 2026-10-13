@@ -25,28 +25,35 @@ def str_to_bool(check: str) -> bool:
 
 
 
+CO_OWNED_TEAM_NAME = 'Curry Tamale'
+
+
 def set_owner_names(league) -> None:
     """
     Gives every team in the league an ``owner_name`` used in all bot messages.
 
-    Uses the first listed owner's first name. If two owners share a first name,
-    their last initial is added (e.g. "Mike S"). Teams with no owner name from
-    ESPN keep using their team abbreviation.
+    Uses the owner's first name. If two owners share a first name, their last
+    initial is added (e.g. "Mike S"). Teams with more than one owner are called
+    CO_OWNED_TEAM_NAME. Teams with no owner name from ESPN keep using their
+    team abbreviation.
     """
     names = []
     for team in league.teams:
-        owner = team.owners[0] if getattr(team, 'owners', None) else {}
+        owners = getattr(team, 'owners', None) or []
+        owner = owners[0] if owners else {}
         first = (owner.get('firstName') or '').strip().title()
         last = (owner.get('lastName') or '').strip().title()
-        names.append((team, first, last))
+        names.append((team, first, last, len(owners) > 1))
 
     counts = {}
-    for _, first, _ in names:
-        if first:
+    for _, first, _, co_owned in names:
+        if first and not co_owned:
             counts[first] = counts.get(first, 0) + 1
 
-    for team, first, last in names:
-        if not first:
+    for team, first, last, co_owned in names:
+        if co_owned:
+            name = CO_OWNED_TEAM_NAME
+        elif not first:
             name = team.team_abbrev
         elif counts[first] > 1 and last:
             name = f'{first} {last[0]}'
