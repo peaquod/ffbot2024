@@ -23,12 +23,12 @@ def scheduler():
     my_timezone = data['my_timezone']
 
     # power rankings:                     tuesday evening at 6:30pm local time.
+    # strength of schedule:               tuesday evening at 6:31pm local time.
     # final scores and trophies:          tuesday morning at 7:30am local time.
     # luck report:                        tuesday morning at 7:35am local time.
     # form report:                        tuesday morning at 7:36am local time.
     # standings:                          wednesday morning at 7:30am local time.
     # waiver report:                      wednesday morning at 7:31am local time. (optional)
-    # strength of schedule:               wednesday morning at 7:35am local time.
     # matchups:                           thursday evening at 7:30pm east coast time.
 
     sched.add_job(espn_bot, 'cron', ['get_power_rankings'], id='power_rankings',
@@ -44,7 +44,7 @@ def scheduler():
                   day_of_week='tue', hour=7, minute=36, start_date=ff_start_date, end_date=ff_end_date,
                   timezone=my_timezone, replace_existing=True)
     sched.add_job(espn_bot, 'cron', ['get_strength_of_schedule'], id='strength_of_schedule',
-                  day_of_week='wed', hour=7, minute=35, start_date=ff_start_date, end_date=ff_end_date,
+                  day_of_week='tue', hour=18, minute=31, start_date=ff_start_date, end_date=ff_end_date,
                   timezone=my_timezone, replace_existing=True)
     sched.add_job(espn_bot, 'cron', ['get_standings'], id='standings',
                   day_of_week='wed', hour=7, minute=30, start_date=ff_start_date, end_date=ff_end_date,

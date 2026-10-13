@@ -30,8 +30,8 @@ DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 # 'daily_waiver' only posts when DAILY_WAIVER is turned on.
 SLOTS = [
     (['tue'], 7, 30, LOCAL_TIMEZONE, ['get_final', 'get_luck_report', 'get_form_report']),
-    (['tue'], 18, 30, LOCAL_TIMEZONE, ['get_power_rankings']),
-    (['wed'], 7, 30, LOCAL_TIMEZONE, ['get_standings', 'get_waiver_report', 'get_strength_of_schedule']),
+    (['tue'], 18, 30, LOCAL_TIMEZONE, ['get_power_rankings', 'get_strength_of_schedule']),
+    (['wed'], 7, 30, LOCAL_TIMEZONE, ['get_standings', 'get_waiver_report']),
     (['thu'], 17, 30, GAME_TIMEZONE, ['get_matchups']),
     (['mon', 'tue', 'thu', 'fri', 'sat', 'sun'], 7, 31, LOCAL_TIMEZONE, ['daily_waiver']),
 ]
