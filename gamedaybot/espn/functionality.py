@@ -1088,7 +1088,7 @@ def get_form_report(league, recent_weeks=3, threshold=10):
         rows.append((recent_avg, round(recent_avg - season_avg, 1) or 0.0, team))
     rows.sort(key=lambda r: r[0], reverse=True)
 
-    text = [f'🔥 Form: last {recent_weeks} wks vs season']
+    text = ['🔥 Who\'s Hot & Who\'s Not 🧊', f'Avg pts last {recent_weeks} wks (vs season avg)']
     for recent_avg, diff, team in rows:
         emoji = ' 🔥' if diff >= threshold else ' 🧊' if diff <= -threshold else ''
         text.append(f'{util.owner_name(team)} {recent_avg:.1f} ({diff:+.1f}){emoji}')
