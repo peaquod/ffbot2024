@@ -14,7 +14,7 @@ from gamedaybot.chat.groupme import GroupMe
 
 ## Manually populate
 LEAGUE_ID = 164483
-LEAGUE_YEAR = 2023
+LEAGUE_YEAR = 2026
 
 league = League(league_id=LEAGUE_ID, year=LEAGUE_YEAR)
 print(espn.get_scoreboard_short(league))
