@@ -187,6 +187,8 @@ def espn_bot(function):
         text = espn.get_form_report(league)
     elif function == "get_strength_of_schedule":
         text = espn.get_strength_of_schedule(league)
+    elif function == "get_clown_watch":
+        text = espn.get_clown_watch(league)
     elif function == "win_matrix":
         text = recap.win_matrix(league)
     elif function == "trophy_recap":

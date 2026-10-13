@@ -64,7 +64,7 @@ def test_late_run_finds_its_scheduled_time():
     now = datetime(2026, 12, 16, 0, 50, tzinfo=timezone.utc)
     when = gha.post_time('10 0 * * 3', now)
     assert when == datetime(2026, 12, 16, 0, 30, tzinfo=timezone.utc)
-    assert gha.functions_due(when) == ['get_power_rankings', 'get_strength_of_schedule']
+    assert gha.functions_due(when) == ['get_power_rankings', 'get_strength_of_schedule', 'get_clown_watch']
     # Thursday 5:30pm EST matchups (run at 22:10 UTC) started an hour late.
     now = datetime(2026, 12, 17, 23, 10, tzinfo=timezone.utc)
     assert gha.functions_due(gha.post_time('10 22 * * 4', now)) == ['get_matchups']

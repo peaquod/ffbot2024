@@ -31,6 +31,7 @@ print(espn.optimal_team_scores(league, full_report=True))
 print(espn.get_luck_report(league))
 print(espn.get_strength_of_schedule(league))
 print(espn.get_form_report(league))
+print(espn.get_clown_watch(league))
 
 print(recap.win_matrix(league))
 print(recap.trophy_recap(league))

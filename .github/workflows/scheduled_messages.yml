@@ -36,6 +36,7 @@ on:
           - get_luck_report
           - get_form_report
           - get_strength_of_schedule
+          - get_clown_watch
           - get_waiver_report
           - win_matrix
           - trophy_recap

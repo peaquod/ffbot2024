@@ -4,6 +4,8 @@ if os.environ.get("AWS_EXECUTION_ENV") is not None:
 else:
     import gamedaybot.utils.util as util
 from datetime import date
+import random
+import statistics
 
 
 def get_scoreboard_short(league, week=None):
@@ -1092,4 +1094,116 @@ def get_form_report(league, recent_weeks=3, threshold=10):
     for recent_avg, diff, team in rows:
         emoji = ' 🔥' if diff >= threshold else ' 🧊' if diff <= -threshold else ''
         text.append(f'{util.owner_name(team)} {recent_avg:.1f} ({diff:+.1f}){emoji}')
+    return '\n'.join(text)
+
+
+def last_place_odds(league, simulations=10000):
+    """
+    Estimates each team's chance of finishing last in the regular season by playing out
+    the remaining schedule many times.
+
+    Each simulated season starts by drawing how good each team "really" is around its
+    season average (pulled toward the league average, more so early in the season), since
+    a few weeks of scores is a small sample. Each simulated week, a team then scores a
+    random amount around that, with the league's typical week-to-week spread. Last place
+    is the fewest wins, then the fewest points.
+
+    Parameters
+    ----------
+    league : object
+        The league object.
+    simulations : int, optional
+        How many seasons to simulate (default 10000).
+
+    Returns
+    -------
+    list
+        [(team, chance_of_last, wins, losses, ties), ...] sorted most likely first, or an
+        empty list before any games are played or after the regular season.
+    """
+    weeks = _completed_weeks(league)
+    reg_season = league.settings.reg_season_count
+    if weeks < 1 or league.current_week - 1 > reg_season:
+        return []
+    results = _weekly_results(league, weeks)
+    teams = [t for t in league.teams if results.get(t)]
+    if len(teams) < 2:
+        return []
+
+    wins, losses, ties, points = {}, {}, {}, {}
+    for team in teams:
+        games = results[team]
+        wins[team] = sum(1 for _, s, o in games if s > o)
+        losses[team] = sum(1 for _, s, o in games if s < o)
+        ties[team] = sum(1 for _, s, o in games if s == o)
+        points[team] = sum(s for _, s, _ in games)
+
+    all_scores = [s for t in teams for _, s, _ in results[t]]
+    league_avg = statistics.mean(all_scores)
+    # Shrink each team's average toward the league's so a hot or cold start isn't overrated.
+    shrink = 3
+    mean = {t: (points[t] + shrink * league_avg) / (len(results[t]) + shrink) for t in teams}
+    spread = [s - statistics.mean([x for _, x, _ in results[t]]) for t in teams for _, s, _ in results[t]]
+    sd = max(statistics.pstdev(spread) if len(spread) > 1 else 0, 15.0)
+    # How unsure we are of each team's true average after the games played so far.
+    mean_sd = {t: sd / (len(results[t]) + shrink) ** 0.5 for t in teams}
+
+    remaining = []
+    for w in range(weeks, reg_season):
+        games = set()
+        for team in teams:
+            if w < len(team.schedule):
+                opp = team.schedule[w]
+                if opp is not team and opp in mean:
+                    games.add(frozenset((team, opp)))
+        remaining.append([tuple(g) for g in games])
+
+    rng = random.Random(f'{league.current_week}-{len(teams)}')
+    last_counts = {t: 0 for t in teams}
+    for _ in range(simulations):
+        true_mean = {t: rng.gauss(mean[t], mean_sd[t]) for t in teams}
+        sim_wins = {t: wins[t] + 0.5 * ties[t] for t in teams}
+        sim_points = dict(points)
+        for games in remaining:
+            for a, b in games:
+                sa, sb = rng.gauss(true_mean[a], sd), rng.gauss(true_mean[b], sd)
+                sim_points[a] += sa
+                sim_points[b] += sb
+                if sa > sb:
+                    sim_wins[a] += 1
+                else:
+                    sim_wins[b] += 1
+        last = min(teams, key=lambda t: (sim_wins[t], sim_points[t]))
+        last_counts[last] += 1
+
+    odds = [(t, last_counts[t] / simulations, wins[t], losses[t], ties[t]) for t in teams]
+    odds.sort(key=lambda r: (-r[1], r[2] + 0.5 * r[4], points[r[0]]))
+    return odds
+
+
+def get_clown_watch(league, count=3):
+    """
+    Lists the teams most likely to finish last in the regular season.
+
+    Parameters
+    ----------
+    league : object
+        The league object.
+    count : int, optional
+        How many teams to list (default 3).
+
+    Returns
+    -------
+    str
+        The Clown Watch report, or an empty string before any games are played or after
+        the regular season.
+    """
+    odds = last_place_odds(league)
+    if not odds:
+        return ''
+    text = ['🤡 CLOWN WATCH 🤡', 'Chance of finishing last']
+    for pos, (team, chance, wins, losses, ties) in enumerate(odds[:count], start=1):
+        record = f'{wins}-{losses}' + (f'-{ties}' if ties else '')
+        pct = '<1%' if 0 < chance < 0.005 else f'{chance:.0%}'
+        text.append(f'{pos}. {util.owner_name(team)} {record} - {pct}')
     return '\n'.join(text)

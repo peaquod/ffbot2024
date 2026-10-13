@@ -24,6 +24,7 @@ def scheduler():
 
     # power rankings:                     tuesday evening at 6:30pm local time.
     # strength of schedule:               tuesday evening at 6:31pm local time.
+    # clown watch:                        tuesday evening at 6:32pm local time.
     # fetti report (final scores, trophies): tuesday at 12:00pm local time.
     # luck report:                        tuesday at 12:05pm local time.
     # who's hot & who's not:             tuesday at 12:06pm local time.
@@ -45,6 +46,9 @@ def scheduler():
                   timezone=my_timezone, replace_existing=True)
     sched.add_job(espn_bot, 'cron', ['get_strength_of_schedule'], id='strength_of_schedule',
                   day_of_week='tue', hour=18, minute=31, start_date=ff_start_date, end_date=ff_end_date,
+                  timezone=my_timezone, replace_existing=True)
+    sched.add_job(espn_bot, 'cron', ['get_clown_watch'], id='clown_watch',
+                  day_of_week='tue', hour=18, minute=32, start_date=ff_start_date, end_date=ff_end_date,
                   timezone=my_timezone, replace_existing=True)
     sched.add_job(espn_bot, 'cron', ['get_standings'], id='standings',
                   day_of_week='wed', hour=7, minute=30, start_date=ff_start_date, end_date=ff_end_date,
