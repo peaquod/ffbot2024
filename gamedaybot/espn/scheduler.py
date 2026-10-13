@@ -24,9 +24,9 @@ def scheduler():
 
     # power rankings:                     tuesday evening at 6:30pm local time.
     # strength of schedule:               tuesday evening at 6:31pm local time.
-    # fetti report (final scores, trophies): tuesday at 12:30pm local time.
-    # luck report:                        tuesday at 12:35pm local time.
-    # who's hot & who's not:             tuesday at 12:36pm local time.
+    # fetti report (final scores, trophies): tuesday at 12:00pm local time.
+    # luck report:                        tuesday at 12:05pm local time.
+    # who's hot & who's not:             tuesday at 12:06pm local time.
     # standings:                          wednesday morning at 7:30am local time.
     # waiver report:                      wednesday morning at 7:31am local time. (optional)
     # matchups:                           thursday evening at 7:30pm east coast time.
@@ -35,13 +35,13 @@ def scheduler():
                   day_of_week='tue', hour=18, minute=30, start_date=ff_start_date, end_date=ff_end_date,
                   timezone=my_timezone, replace_existing=True)
     sched.add_job(espn_bot, 'cron', ['get_final'], id='final',
-                  day_of_week='tue', hour=12, minute=30, start_date=ff_start_date, end_date=ff_end_date,
+                  day_of_week='tue', hour=12, minute=0, start_date=ff_start_date, end_date=ff_end_date,
                   timezone=my_timezone, replace_existing=True)
     sched.add_job(espn_bot, 'cron', ['get_luck_report'], id='luck_report',
-                  day_of_week='tue', hour=12, minute=35, start_date=ff_start_date, end_date=ff_end_date,
+                  day_of_week='tue', hour=12, minute=5, start_date=ff_start_date, end_date=ff_end_date,
                   timezone=my_timezone, replace_existing=True)
     sched.add_job(espn_bot, 'cron', ['get_form_report'], id='form_report',
-                  day_of_week='tue', hour=12, minute=36, start_date=ff_start_date, end_date=ff_end_date,
+                  day_of_week='tue', hour=12, minute=6, start_date=ff_start_date, end_date=ff_end_date,
                   timezone=my_timezone, replace_existing=True)
     sched.add_job(espn_bot, 'cron', ['get_strength_of_schedule'], id='strength_of_schedule',
                   day_of_week='tue', hour=18, minute=31, start_date=ff_start_date, end_date=ff_end_date,

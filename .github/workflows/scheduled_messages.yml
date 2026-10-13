@@ -9,11 +9,11 @@ name: Scheduled messages
 
 on:
   schedule:
+    - cron: '0 17 * * 2'
+    - cron: '0 18 * * 2'
     - cron: '30 0 * * 3'
     - cron: '30 12 * * 3'
     - cron: '30 13 * * 3'
-    - cron: '30 17 * * 2'
-    - cron: '30 18 * * 2'
     - cron: '30 21 * * 4'
     - cron: '30 22 * * 4'
     - cron: '30 23 * * 2'
