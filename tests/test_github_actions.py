@@ -42,14 +42,13 @@ def test_every_slot_runs_exactly_once_all_year():
 
 
 def test_other_daylight_copy_does_nothing():
-    # Tuesday 7:30am Winnipeg in October (CDT) is 12:30 UTC; the 13:30 UTC copy is idle.
-    assert gha.functions_due(datetime(2026, 10, 13, 12, 30, tzinfo=timezone.utc)) == \
-        ['get_final', 'get_luck_report', 'get_form_report']
-    assert gha.functions_due(datetime(2026, 10, 13, 13, 30, tzinfo=timezone.utc)) == []
+    fetti = ['get_final', 'get_luck_report', 'get_form_report']
+    # Tuesday 12:30pm Winnipeg in October (CDT) is 17:30 UTC; the 18:30 UTC copy is idle.
+    assert gha.functions_due(datetime(2026, 10, 13, 17, 30, tzinfo=timezone.utc)) == fetti
+    assert gha.functions_due(datetime(2026, 10, 13, 18, 30, tzinfo=timezone.utc)) == []
     # In December (CST) it's the other way round.
-    assert gha.functions_due(datetime(2026, 12, 15, 13, 30, tzinfo=timezone.utc)) == \
-        ['get_final', 'get_luck_report', 'get_form_report']
-    assert gha.functions_due(datetime(2026, 12, 15, 12, 30, tzinfo=timezone.utc)) == []
+    assert gha.functions_due(datetime(2026, 12, 15, 18, 30, tzinfo=timezone.utc)) == fetti
+    assert gha.functions_due(datetime(2026, 12, 15, 17, 30, tzinfo=timezone.utc)) == []
 
 
 def test_late_run_finds_its_scheduled_time():
