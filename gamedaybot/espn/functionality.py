@@ -26,7 +26,7 @@ def get_scoreboard_short(league, week=None):
 
     # Gets current week's scoreboard
     box_scores = league.box_scores(week=week)
-    score = ['%4s %6.2f - %6.2f %s' % (util.owner_name(i.home_team), i.home_score,
+    score = ['%s %.2f - %.2f %s' % (util.owner_name(i.home_team), i.home_score,
                                        i.away_score, util.owner_name(i.away_team)) for i in box_scores
              if i.away_team]
     text = ['Score Update'] + score
@@ -53,7 +53,7 @@ def get_projected_scoreboard(league, week=None):
 
     # Gets current week's scoreboard projections
     box_scores = league.box_scores(week=week)
-    score = ['%4s %6.2f - %6.2f %s' % (util.owner_name(i.home_team), get_projected_total(i.home_lineup),
+    score = ['%s %.2f - %.2f %s' % (util.owner_name(i.home_team), get_projected_total(i.home_lineup),
                                        get_projected_total(i.away_lineup), util.owner_name(i.away_team)) for i in box_scores
              if i.away_team]
     text = ['Approximate Projected Scores'] + score
@@ -271,7 +271,7 @@ def get_matchups(league, week=None):
 
     full_names = ['%s vs %s' % (util.owner_name(i.home_team), util.owner_name(i.away_team)) for i in matchups if i.away_team]
 
-    abbrevs = ['%4s (%s-%s) vs (%s-%s) %s' % (util.owner_name(i.home_team), i.home_team.wins, i.home_team.losses,
+    abbrevs = ['%s (%s-%s) vs (%s-%s) %s' % (util.owner_name(i.home_team), i.home_team.wins, i.home_team.losses,
                                               i.away_team.wins, i.away_team.losses, util.owner_name(i.away_team)) for i in matchups
                if i.away_team]
 
@@ -307,7 +307,7 @@ def get_close_scores(league, week=None):
             diffScore = away_projected - home_projected
 
             if (abs(diffScore) <= 15 and (not all_played(i.away_lineup) or not all_played(i.home_lineup))):
-                score += ['%4s %6.2f - %6.2f %s' % (util.owner_name(i.home_team), i.home_projected,
+                score += ['%s %.2f - %.2f %s' % (util.owner_name(i.home_team), i.home_projected,
                                                     i.away_projected, util.owner_name(i.away_team))]
 
     if not score:
