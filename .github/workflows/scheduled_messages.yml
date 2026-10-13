@@ -1,0 +1,85 @@
+name: Scheduled messages
+
+# Posts the bot's messages to your chat on the weekly schedule in
+# gamedaybot/espn/github_actions.py (Central time for most posts, Eastern for game-time posts).
+# GitHub schedules in UTC, so each post appears twice below, once for daylight time and once
+# for standard time; the copy that doesn't match the current clock does nothing.
+# If you change the schedule there, regenerate this list with:
+#   python -m gamedaybot.espn.github_actions --print-crons
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+    - cron: '0 1 * * 1'
+    - cron: '0 20 * * 0'
+    - cron: '0 21 * * 0'
+    - cron: '30 0 * * 3'
+    - cron: '30 12 * * 0,1,2,3,5'
+    - cron: '30 13 * * 0,1,2,3,5'
+    - cron: '30 21 * * 4'
+    - cron: '30 22 * * 1,4'
+    - cron: '30 23 * * 1,2'
+    - cron: '31 12 * * 0,1,2,4,5,6'
+    - cron: '31 13 * * 0,1,2,4,5,6'
+  workflow_dispatch:
+    inputs:
+      function:
+        description: Message to post right now
+        required: true
+        type: choice
+        options:
+          - get_scoreboard_short
+          - get_projected_scoreboard
+          - get_standings
+          - get_matchups
+          - get_close_scores
+          - get_power_rankings
+          - get_final
+          - get_trophies
+          - get_luck_report
+          - get_form_report
+          - get_strength_of_schedule
+          - get_waiver_report
+          - get_monitor
+          - win_matrix
+          - trophy_recap
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # Required (Settings > Secrets and variables > Actions > Secrets)
+      BOT_ID: ${{ secrets.BOT_ID }}
+      LEAGUE_ID: ${{ secrets.LEAGUE_ID }}
+      # Needed for private leagues and the waiver report
+      SWID: ${{ secrets.SWID }}
+      ESPN_S2: ${{ secrets.ESPN_S2 }}
+      # Optional (Settings > Secrets and variables > Actions > Variables)
+      LEAGUE_YEAR: ${{ vars.LEAGUE_YEAR }}
+      START_DATE: ${{ vars.START_DATE }}
+      END_DATE: ${{ vars.END_DATE }}
+      DAILY_WAIVER: ${{ vars.DAILY_WAIVER }}
+      MONITOR_REPORT: ${{ vars.MONITOR_REPORT }}
+      TOP_HALF_SCORING: ${{ vars.TOP_HALF_SCORING }}
+      RANDOM_PHRASE: ${{ vars.RANDOM_PHRASE }}
+      TIMEZONE: America/Winnipeg
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Post scheduled messages
+        if: github.event_name == 'schedule'
+        run: python -m gamedaybot.espn.github_actions "${{ github.event.schedule }}"
+
+      - name: Post selected message
+        if: github.event_name == 'workflow_dispatch'
+        run: python -m gamedaybot.espn.github_actions --run "${{ inputs.function }}"
