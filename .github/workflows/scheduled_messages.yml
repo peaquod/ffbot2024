@@ -9,16 +9,12 @@ name: Scheduled messages
 
 on:
   schedule:
-    - cron: '0 0 * * 1'
-    - cron: '0 1 * * 1'
-    - cron: '0 20 * * 0'
-    - cron: '0 21 * * 0'
     - cron: '30 0 * * 3'
-    - cron: '30 12 * * 0,1,2,3,5'
-    - cron: '30 13 * * 0,1,2,3,5'
+    - cron: '30 12 * * 2,3'
+    - cron: '30 13 * * 2,3'
     - cron: '30 21 * * 4'
-    - cron: '30 22 * * 1,4'
-    - cron: '30 23 * * 1,2'
+    - cron: '30 22 * * 4'
+    - cron: '30 23 * * 2'
     - cron: '31 12 * * 0,1,2,4,5,6'
     - cron: '31 13 * * 0,1,2,4,5,6'
   workflow_dispatch:
@@ -28,11 +24,8 @@ on:
         required: true
         type: choice
         options:
-          - get_scoreboard_short
-          - get_projected_scoreboard
           - get_standings
           - get_matchups
-          - get_close_scores
           - get_power_rankings
           - get_final
           - get_trophies
@@ -40,7 +33,6 @@ on:
           - get_form_report
           - get_strength_of_schedule
           - get_waiver_report
-          - get_monitor
           - win_matrix
           - trophy_recap
 
@@ -60,7 +52,6 @@ jobs:
       START_DATE: ${{ vars.START_DATE }}
       END_DATE: ${{ vars.END_DATE }}
       DAILY_WAIVER: ${{ vars.DAILY_WAIVER }}
-      MONITOR_REPORT: ${{ vars.MONITOR_REPORT }}
       TOP_HALF_SCORING: ${{ vars.TOP_HALF_SCORING }}
       RANDOM_PHRASE: ${{ vars.RANDOM_PHRASE }}
       TIMEZONE: America/Winnipeg

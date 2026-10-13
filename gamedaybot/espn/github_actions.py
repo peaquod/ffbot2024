@@ -27,17 +27,12 @@ GAME_TIMEZONE = 'America/New_York'
 DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
 # (days, hour, minute, timezone, functions to run in order)
-# 'daily_waiver' and 'get_monitor' only post when DAILY_WAIVER / MONITOR_REPORT allow it.
+# 'daily_waiver' only posts when DAILY_WAIVER is turned on.
 SLOTS = [
-    (['mon'], 18, 30, GAME_TIMEZONE, ['get_close_scores']),
     (['tue'], 7, 30, LOCAL_TIMEZONE, ['get_final', 'get_luck_report', 'get_form_report']),
     (['tue'], 18, 30, LOCAL_TIMEZONE, ['get_power_rankings']),
     (['wed'], 7, 30, LOCAL_TIMEZONE, ['get_standings', 'get_waiver_report', 'get_strength_of_schedule']),
     (['thu'], 17, 30, GAME_TIMEZONE, ['get_matchups']),
-    (['mon', 'fri'], 7, 30, LOCAL_TIMEZONE, ['get_scoreboard_short']),
-    (['sun'], 7, 30, LOCAL_TIMEZONE, ['get_monitor']),
-    (['sun'], 16, 0, GAME_TIMEZONE, ['get_scoreboard_short']),
-    (['sun'], 20, 0, GAME_TIMEZONE, ['get_scoreboard_short']),
     (['mon', 'tue', 'thu', 'fri', 'sat', 'sun'], 7, 31, LOCAL_TIMEZONE, ['daily_waiver']),
 ]
 
@@ -126,8 +121,7 @@ def main(argv):
             print('Not in season, skipping.')
             return
         functions = [f for f in functions
-                     if not (f == 'get_monitor' and not data['monitor_report'])
-                     and not (f == 'daily_waiver' and not data['daily_waiver'])]
+                     if not (f == 'daily_waiver' and not data['daily_waiver'])]
         functions = ['get_waiver_report' if f == 'daily_waiver' else f for f in functions]
         # The waiver report needs SWID and ESPN_S2; without them the bot posts an error.
         if data['swid'] == '{1}' or data['espn_s2'] == '1':

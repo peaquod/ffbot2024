@@ -58,8 +58,13 @@ def test_late_run_finds_its_scheduled_time():
     when = gha.scheduled_time('30 0 * * 3', now)
     assert when == datetime(2026, 12, 16, 0, 30, tzinfo=timezone.utc)
     assert gha.functions_due(when) == ['get_power_rankings']
-    # Monday 6:30pm EST close scores run late past midnight UTC.
-    now = datetime(2026, 12, 15, 0, 5, tzinfo=timezone.utc)
-    when = gha.scheduled_time('30 23 * * 1,2', now)
-    assert when == datetime(2026, 12, 14, 23, 30, tzinfo=timezone.utc)
-    assert gha.functions_due(when) == ['get_close_scores']
+    # Thursday 5:30pm EST matchups are 22:30 UTC; a 20 minute delay still finds them.
+    now = datetime(2026, 12, 17, 22, 50, tzinfo=timezone.utc)
+    when = gha.scheduled_time('30 22 * * 4', now)
+    assert gha.functions_due(when) == ['get_matchups']
+
+
+def test_removed_reports_never_post():
+    removed = {'get_scoreboard_short', 'get_projected_scoreboard', 'get_close_scores', 'get_monitor'}
+    scheduled = {f for slot in gha.SLOTS for f in slot[4]}
+    assert not removed & scheduled
