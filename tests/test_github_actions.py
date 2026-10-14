@@ -167,3 +167,17 @@ def test_failed_or_other_runs_do_not_block():
             _run(3, '2026-10-20T16:55:00Z', 'tuesday_evening'),
             _run(4, '2026-10-20T17:00:03Z', 'fetti_report', status='in_progress', conclusion=None)]
     assert gha.handled_by_earlier_run(runs, 4, 'fetti_report') is None
+
+
+def test_manual_waiver_report_without_cookies_posts_nothing(monkeypatch):
+    import pytest
+    import gamedaybot.espn.espn_bot as bot
+    posted = []
+    monkeypatch.setattr(bot, 'espn_bot', posted.append)
+    monkeypatch.setenv('BOT_ID', 'abc123')
+    monkeypatch.setenv('LEAGUE_ID', '1')
+    monkeypatch.delenv('SWID', raising=False)
+    monkeypatch.setenv('ESPN_S2', '')
+    with pytest.raises(SystemExit):
+        gha.main(['x', '--run', 'get_waiver_report'])
+    assert posted == []

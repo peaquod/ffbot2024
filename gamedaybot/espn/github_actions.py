@@ -234,6 +234,11 @@ def main(argv):
             print(f'Posting {slot} now')
         else:
             functions = [argv[2]]
+            # Without SWID and ESPN_S2 the bot would post an error message to the chat.
+            if argv[2] == 'get_waiver_report' and not (os.environ.get('SWID') and os.environ.get('ESPN_S2')):
+                print('The waiver report needs the SWID and ESPN_S2 secrets. Add them in the repo\'s '
+                      'Settings > Secrets and variables > Actions, then run this again.')
+                sys.exit(1)
     elif len(argv) == 2:
         when = post_time(argv[1])
         slot = slot_at(when)
