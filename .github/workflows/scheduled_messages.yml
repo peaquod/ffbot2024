@@ -1,12 +1,18 @@
 name: Scheduled messages
+run-name: ${{ inputs.function || github.event.schedule || github.workflow }}
 
 # Posts the bot's messages to your chat on the weekly schedule in
 # gamedaybot/espn/github_actions.py (Central time for most posts, Eastern for game-time posts).
-# GitHub schedules in UTC, so each post appears twice below, once for daylight time and once
-# for standard time; the copy that doesn't match the current clock does nothing.
-# Each run starts 20 minutes early, because GitHub often runs schedules late, and waits
-# until the post time.
-# If you change the schedule there, regenerate this list with:
+#
+# Main trigger: an outside timer (cron-job.org) starts this workflow at each post time with
+# one of the slot names below (fetti_report, tuesday_evening, wednesday_morning,
+# thursday_matchups), because GitHub's own schedules are often hours late or skipped.
+#
+# Backup: GitHub's schedule below. It's in UTC, so each slot appears twice (daylight and
+# standard time); the copy that doesn't match the current clock does nothing. Each backup run
+# starts 20 minutes early and waits until the post time. If the timer already posted a slot,
+# the backup skips it, and vice versa, so nothing is posted twice.
+# If you change the schedule, regenerate this list with:
 #   python -m gamedaybot.espn.github_actions --print-crons
 
 on:
@@ -28,6 +34,10 @@ on:
         required: true
         type: choice
         options:
+          - fetti_report
+          - tuesday_evening
+          - wednesday_morning
+          - thursday_matchups
           - get_standings
           - get_matchups
           - get_power_rankings
@@ -40,6 +50,10 @@ on:
           - get_waiver_report
           - win_matrix
           - trophy_recap
+
+permissions:
+  actions: read
+  contents: read
 
 jobs:
   post:
@@ -60,6 +74,7 @@ jobs:
       TOP_HALF_SCORING: ${{ vars.TOP_HALF_SCORING }}
       RANDOM_PHRASE: ${{ vars.RANDOM_PHRASE }}
       TIMEZONE: America/Winnipeg
+      GITHUB_TOKEN: ${{ github.token }}
 
     steps:
       - uses: actions/checkout@v4

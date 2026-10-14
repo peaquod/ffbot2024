@@ -1,18 +1,23 @@
 """
 Runs the bot's scheduled messages from GitHub Actions.
 
-GitHub only schedules in UTC, so .github/workflows/scheduled_messages.yml lists each
-post twice: once for daylight time and once for standard time. Every run works out
-which post it was started for by converting its scheduled time back to the post's
-timezone, so the copy that doesn't match the current clock does nothing.
+Each group of posts is a "slot" (see SLOTS). A slot can be started three ways:
 
-GitHub often starts scheduled runs late, especially near the top of the hour, and
-sometimes drops them. So each run is scheduled LEAD_MINUTES early, at a quieter
-minute, and waits until the post time before posting.
+1. By an outside timer such as cron-job.org, which asks GitHub to run the workflow with
+   the slot's name (e.g. "fetti_report") at the exact post time. This is the main trigger,
+   because GitHub's own schedules are often hours late or skipped.
+2. By GitHub's own schedule, as a backup. GitHub only schedules in UTC, so
+   .github/workflows/scheduled_messages.yml lists each slot twice (daylight and standard
+   time); the copy that doesn't match the current clock does nothing. These runs are
+   scheduled LEAD_MINUTES early and wait until the post time.
+3. By hand, from the "Run workflow" button.
+
+Before posting a slot, the run checks the workflow's other recent runs and skips if an
+earlier run already handled the same slot, so the timer and the backup never double-post.
 
 Usage:
-    python -m gamedaybot.espn.github_actions "<cron string>"     # from a schedule
-    python -m gamedaybot.espn.github_actions --run <function>     # run one message now
+    python -m gamedaybot.espn.github_actions "<cron string>"     # from a GitHub schedule
+    python -m gamedaybot.espn.github_actions --run <slot or function>
     python -m gamedaybot.espn.github_actions --print-crons        # crons for the workflow
 """
 import os
@@ -29,27 +34,41 @@ LOCAL_TIMEZONE = 'America/Winnipeg'
 # NFL game times are always US Eastern.
 GAME_TIMEZONE = 'America/New_York'
 
-# How early each GitHub run is scheduled before its post time.
+# How early each GitHub backup run is scheduled before its post time.
 LEAD_MINUTES = 20
 # A run that starts this long after its post time is skipped rather than posting stale news.
 MAX_LATE = timedelta(hours=2)
+# How far back to look for another run that already posted the same slot.
+DUPLICATE_WINDOW = timedelta(hours=6)
 
 DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
-# (days, hour, minute, timezone, functions to run in order)
+# (name, days, hour, minute, timezone, functions to run in order)
 # 'daily_waiver' only posts when DAILY_WAIVER is turned on.
 SLOTS = [
-    (['tue'], 12, 0, LOCAL_TIMEZONE, ['get_final', 'get_luck_report', 'get_form_report']),
-    (['tue'], 18, 30, LOCAL_TIMEZONE, ['get_power_rankings', 'get_strength_of_schedule', 'get_clown_watch']),
-    (['wed'], 7, 30, LOCAL_TIMEZONE, ['get_standings', 'get_waiver_report']),
-    (['thu'], 17, 30, GAME_TIMEZONE, ['get_matchups']),
-    (['mon', 'tue', 'thu', 'fri', 'sat', 'sun'], 7, 31, LOCAL_TIMEZONE, ['daily_waiver']),
+    ('fetti_report', ['tue'], 12, 0, LOCAL_TIMEZONE,
+     ['get_final', 'get_luck_report', 'get_form_report']),
+    ('tuesday_evening', ['tue'], 18, 30, LOCAL_TIMEZONE,
+     ['get_power_rankings', 'get_strength_of_schedule', 'get_clown_watch']),
+    ('wednesday_morning', ['wed'], 7, 30, LOCAL_TIMEZONE, ['get_standings', 'get_waiver_report']),
+    ('thursday_matchups', ['thu'], 17, 30, GAME_TIMEZONE, ['get_matchups']),
+    ('daily_waiver', ['mon', 'tue', 'thu', 'fri', 'sat', 'sun'], 7, 31, LOCAL_TIMEZONE,
+     ['daily_waiver']),
 ]
+SLOT_NAMES = [s[0] for s in SLOTS]
 
 
 def _cron_dow(day_index):
     """Converts Python's weekday (Mon=0) to cron's (Sun=0)."""
     return (day_index + 1) % 7
+
+
+def slot_functions(name):
+    """Returns the functions a slot posts."""
+    for slot in SLOTS:
+        if slot[0] == name:
+            return list(slot[5])
+    raise KeyError(name)
 
 
 def generate_crons(year=None):
@@ -62,7 +81,7 @@ def generate_crons(year=None):
     # One date in summer and one in winter, so both UTC offsets are covered.
     for sample in (datetime(year, 7, 1), datetime(year, 1, 10)):
         sample -= timedelta(days=sample.weekday())  # the Monday of that week
-        for days, hour, minute, tz in ((s[0], s[1], s[2], s[3]) for s in SLOTS):
+        for _, days, hour, minute, tz, _ in SLOTS:
             for day in days:
                 local = (sample + timedelta(days=DAYS.index(day))).replace(
                     hour=hour, minute=minute, tzinfo=ZoneInfo(tz))
@@ -98,14 +117,99 @@ def post_time(cron, now=None):
     return scheduled_time(cron, now) + timedelta(minutes=LEAD_MINUTES)
 
 
-def functions_due(when_utc):
-    """Returns the functions whose slot matches the given UTC time, in order."""
-    due = []
-    for days, hour, minute, tz, functions in SLOTS:
+def slot_at(when_utc):
+    """Returns the name of the slot that posts at the given UTC time, or None."""
+    for name, days, hour, minute, tz, _ in SLOTS:
         local = when_utc.astimezone(ZoneInfo(tz))
         if DAYS[local.weekday()] in days and local.hour == hour and local.minute == minute:
-            due.extend(functions)
-    return due
+            return name
+    return None
+
+
+def functions_due(when_utc):
+    """Returns the functions whose slot posts at the given UTC time, in order."""
+    name = slot_at(when_utc)
+    return slot_functions(name) if name else []
+
+
+def _is_cron(text):
+    parts = (text or '').split()
+    return len(parts) == 5 and all(p.replace(',', '').replace('*', '0').isdigit() for p in parts)
+
+
+def run_slot(title, created_at):
+    """Works out which slot a workflow run handled from its title (see run-name)."""
+    if title in SLOT_NAMES:
+        return title
+    if _is_cron(title):
+        try:
+            return slot_at(post_time(title, created_at))
+        except ValueError:
+            return None
+    return None
+
+
+def _parse_time(text):
+    return datetime.fromisoformat(text.replace('Z', '+00:00'))
+
+
+def handled_by_earlier_run(runs, my_run_id, slot):
+    """
+    Returns the earlier run that already posted (or is about to post) this slot, if any.
+    `runs` are GitHub workflow-run dicts. Runs that were queued, running or succeeded count.
+    """
+    mine = next((r for r in runs if r['id'] == my_run_id), None)
+    if mine is None:
+        return None
+    my_key = (_parse_time(mine['created_at']), mine['id'])
+    for r in runs:
+        if r['id'] == my_run_id:
+            continue
+        if (_parse_time(r['created_at']), r['id']) >= my_key:
+            continue
+        if r['status'] == 'completed' and r.get('conclusion') != 'success':
+            continue
+        if run_slot(r.get('display_title'), _parse_time(r['created_at'])) == slot:
+            return r
+    return None
+
+
+def _fetch_recent_runs():
+    """Lists this workflow's recent runs using the token GitHub gives every run."""
+    import requests
+    repo = os.environ['GITHUB_REPOSITORY']
+    run_id = int(os.environ['GITHUB_RUN_ID'])
+    headers = {'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}",
+               'Accept': 'application/vnd.github+json'}
+    mine = requests.get(f'https://api.github.com/repos/{repo}/actions/runs/{run_id}',
+                        headers=headers, timeout=30)
+    mine.raise_for_status()
+    workflow_id = mine.json()['workflow_id']
+    since = (datetime.now(timezone.utc) - DUPLICATE_WINDOW).strftime('%Y-%m-%dT%H:%M:%SZ')
+    r = requests.get(f'https://api.github.com/repos/{repo}/actions/workflows/{workflow_id}/runs',
+                     params={'created': f'>={since}', 'per_page': 100}, headers=headers, timeout=30)
+    r.raise_for_status()
+    runs = r.json()['workflow_runs']
+    if not any(x['id'] == run_id for x in runs):
+        runs.append(mine.json())
+    return run_id, runs
+
+
+def already_posted(slot):
+    """True if another run already handled this slot. Errs on the side of posting."""
+    if not os.environ.get('GITHUB_TOKEN') or not os.environ.get('GITHUB_RUN_ID'):
+        return False
+    try:
+        run_id, runs = _fetch_recent_runs()
+    except Exception as e:
+        print(f'Could not check for duplicate runs ({e}); posting anyway.')
+        return False
+    earlier = handled_by_earlier_run(runs, run_id, slot)
+    if earlier:
+        print(f'Skipping: run {earlier["id"]} ({earlier["event"]}, {earlier["created_at"]}) '
+              f'already handled {slot}.')
+        return True
+    return False
 
 
 def main(argv):
@@ -123,38 +227,49 @@ def main(argv):
     from gamedaybot.espn.espn_bot import espn_bot
     import gamedaybot.utils.util as util
 
+    slot, when = None, None
     if len(argv) == 3 and argv[1] == '--run':
-        functions = [argv[2]]
+        if argv[2] in SLOT_NAMES:
+            slot = argv[2]
+            print(f'Posting {slot} now')
+        else:
+            functions = [argv[2]]
     elif len(argv) == 2:
         when = post_time(argv[1])
-        functions = functions_due(when)
-        print(f'Posting at {when.astimezone(ZoneInfo(LOCAL_TIMEZONE)):%a %Y-%m-%d %H:%M %Z}: '
-              f'{", ".join(functions) or "nothing (other daylight-saving copy)"}')
-        if not functions:
+        slot = slot_at(when)
+        print(f'Backup schedule for {when.astimezone(ZoneInfo(LOCAL_TIMEZONE)):%a %Y-%m-%d %H:%M %Z}: '
+              f'{slot or "nothing (other daylight-saving copy)"}')
+        if not slot:
             return
         late = datetime.now(timezone.utc) - when
         if late > MAX_LATE:
             print(f'GitHub started this run {late} late; skipping so old news is not posted.')
             return
+    else:
+        print(__doc__)
+        sys.exit(2)
 
+    if slot:
+        functions = slot_functions(slot)
         data = get_env_vars()
         if not util.currently_in_season(data['ff_start_date'], data['ff_end_date']):
             print('Not in season, skipping.')
             return
-        functions = [f for f in functions
-                     if not (f == 'daily_waiver' and not data['daily_waiver'])]
+        if 'daily_waiver' in functions and not data['daily_waiver']:
+            print('DAILY_WAIVER is off, skipping.')
+            return
         functions = ['get_waiver_report' if f == 'daily_waiver' else f for f in functions]
         # The waiver report needs SWID and ESPN_S2; without them the bot posts an error.
         if data['swid'] == '{1}' or data['espn_s2'] == '1':
             functions = [f for f in functions if f != 'get_waiver_report']
 
-        wait = (when - datetime.now(timezone.utc)).total_seconds()
-        if functions and wait > 0:
-            print(f'Waiting {wait / 60:.1f} minutes until post time')
-            time.sleep(wait)
-    else:
-        print(__doc__)
-        sys.exit(2)
+        if when:
+            wait = (when - datetime.now(timezone.utc)).total_seconds()
+            if wait > 0:
+                print(f'Waiting {wait / 60:.1f} minutes until post time')
+                time.sleep(wait)
+        if already_posted(slot):
+            return
 
     failed = []
     for function in functions:
