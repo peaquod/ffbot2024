@@ -132,6 +132,13 @@ def functions_due(when_utc):
     return slot_functions(name) if name else []
 
 
+def is_preseason_week(start_date, today=None):
+    """True during the 7 days before the season's first game (START_DATE)."""
+    today = today or datetime.now(ZoneInfo(LOCAL_TIMEZONE)).date()
+    kickoff = datetime.strptime(start_date, '%Y-%m-%d').date()
+    return 0 < (kickoff - today).days <= 7
+
+
 def _is_cron(text):
     parts = (text or '').split()
     return len(parts) == 5 and all(p.replace(',', '').replace('*', '0').isdigit() for p in parts)
@@ -258,8 +265,12 @@ def main(argv):
         functions = slot_functions(slot)
         data = get_env_vars()
         if not util.currently_in_season(data['ff_start_date'], data['ff_end_date']):
-            print('Not in season, skipping.')
-            return
+            if slot == 'wednesday_morning' and is_preseason_week(data['ff_start_date']):
+                print('Kickoff is this week: posting the History Report.')
+                functions = ['get_history_report']  # still checked for duplicates as wednesday_morning
+            else:
+                print('Not in season, skipping.')
+                return
         if 'daily_waiver' in functions and not data['daily_waiver']:
             print('DAILY_WAIVER is off, skipping.')
             return

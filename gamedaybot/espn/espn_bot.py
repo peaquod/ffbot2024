@@ -2,6 +2,7 @@ import os
 if os.environ.get("AWS_EXECUTION_ENV") is not None:
     # For use in lambda function
     import utils.util as util
+    import espn.history as history
     from chat.groupme import GroupMe
     from chat.slack import Slack
     from chat.discord import Discord
@@ -16,6 +17,7 @@ else:
     from gamedaybot.espn.env_vars import get_env_vars
     import gamedaybot.espn.functionality as espn
     import gamedaybot.espn.season_recap as recap
+    import gamedaybot.espn.history as history
 
 
 from espn_api.football import League
@@ -25,6 +27,15 @@ import logging
 logger = logging.getLogger(__name__)
 # logger.setLevel(logging.INFO)
 logger.setLevel(logging.DEBUG)
+
+
+def _safe_history(func, *args, **kwargs):
+    """Runs a league-history feature; if it fails, logs it and returns '' so the main post still goes out."""
+    try:
+        return func(*args, **kwargs)
+    except Exception:
+        logger.exception("League history failed in %s", func.__name__)
+        return ''
 
 
 def espn_bot(function):
@@ -156,7 +167,7 @@ def espn_bot(function):
         broadcast_message = None
 
     # always let init and broadcast run
-    if function not in ["init", "broadcast", "win_matrix", "trophy_recap"] and league.scoringPeriodId > len(league.settings.matchup_periods):
+    if function not in ["init", "broadcast", "win_matrix", "trophy_recap", "get_history_report"] and league.scoringPeriodId > len(league.settings.matchup_periods):
         logger.info("Not in active season")
         return
 
@@ -166,6 +177,7 @@ def espn_bot(function):
     if function == "get_matchups":
         text = espn.get_matchups(league, random_phrase)
         text = text + "\n\n" + espn.get_projected_scoreboard(league)
+        text = [text, _safe_history(history.get_matchup_history, league)]
     elif function == "get_monitor":
         text = espn.get_monitor(league)
     elif function == "get_scoreboard_short":
@@ -201,6 +213,13 @@ def espn_bot(function):
         week = league.current_week - 1
         text = "🎊The Fetti Report🎊\n\nFinal " + espn.get_scoreboard_short(league, week=week)
         text = text + "\n\n" + espn.get_trophies(league, week=week)
+        text = [text, _safe_history(history.get_record_alerts, league, week=week)]
+    elif function == "get_history_report":
+        text = _safe_history(history.get_history_report, league) or ''
+    elif function == "get_record_alerts":
+        text = _safe_history(history.get_record_alerts, league)
+    elif function == "get_matchup_history":
+        text = _safe_history(history.get_matchup_history, league)
     elif function == "get_waiver_report" and swid != '{1}' and espn_s2 != '1':
         faab = league.settings.faab
         text = espn.get_waiver_report(league, faab)
@@ -220,9 +239,11 @@ def espn_bot(function):
         text = "Something bad happened. HALP"
 
     logger.debug(data)
-    if text != '':
+    # A list means several separate posts, sent in order; empty ones are skipped.
+    parts = text if isinstance(text, list) else [text]
+    messages = [m for part in parts if part for m in util.str_limit_check(part, str_limit)]
+    if messages:
         logger.debug(text)
-        messages = util.str_limit_check(text, str_limit)
         for message in messages:
             groupme_bot.send_message(message)
             slack_bot.send_message(message)

@@ -181,3 +181,29 @@ def test_manual_waiver_report_without_cookies_posts_nothing(monkeypatch):
     with pytest.raises(SystemExit):
         gha.main(['x', '--run', 'get_waiver_report'])
     assert posted == []
+
+
+def test_preseason_week():
+    from datetime import date
+    assert gha.is_preseason_week('2027-09-09', today=date(2027, 9, 8))       # Wednesday before kickoff
+    assert gha.is_preseason_week('2027-09-09', today=date(2027, 9, 2))
+    assert not gha.is_preseason_week('2027-09-09', today=date(2027, 9, 1))
+    assert not gha.is_preseason_week('2027-09-09', today=date(2027, 9, 9))
+    assert not gha.is_preseason_week('2027-09-09', today=date(2027, 2, 3))
+
+
+def test_preseason_wednesday_posts_history_report(monkeypatch):
+    import gamedaybot.espn.espn_bot as bot
+    import gamedaybot.utils.util as util
+    posted = []
+    monkeypatch.setattr(bot, 'espn_bot', posted.append)
+    monkeypatch.setattr(util, 'currently_in_season', lambda *a, **k: False)
+    monkeypatch.setattr(gha, 'is_preseason_week', lambda *a, **k: True)
+    monkeypatch.setenv('BOT_ID', 'abc123')
+    monkeypatch.setenv('LEAGUE_ID', '1')
+    monkeypatch.delenv('GITHUB_TOKEN', raising=False)
+    gha.main(['x', '--run', 'wednesday_morning'])
+    assert posted == ['get_history_report']
+    posted.clear()
+    gha.main(['x', '--run', 'tuesday_evening'])       # other off-season slots stay quiet
+    assert posted == []

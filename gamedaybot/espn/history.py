@@ -319,7 +319,7 @@ def get_history_report(league, history=None):
     current_keys = {h.team_key(t) for t in league.teams}
     lines = ['📊 All-Time Standings (reg. season)']
     for pos, (k, (w, l, t, pts, n)) in enumerate([r for r in rows if r[0] in current_keys], start=1):
-        ring = ' 🏆' * titles.get(k, 0)
+        ring = (' ' + '🏆' * titles[k]) if titles.get(k) else ''
         lines.append(f'{pos}. {h.name(k)} {_record(w, l, t)} ({_pct(w, l, t):.3f}){ring}')
     messages.append('\n'.join(lines))
 

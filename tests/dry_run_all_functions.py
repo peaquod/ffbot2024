@@ -32,6 +32,10 @@ print(espn.get_luck_report(league))
 print(espn.get_strength_of_schedule(league))
 print(espn.get_form_report(league))
 print(espn.get_clown_watch(league))
+import gamedaybot.espn.history as history
+print('\n\n'.join(history.get_history_report(league)))
+print(history.get_matchup_history(league))
+print(history.get_record_alerts(league))
 
 print(recap.win_matrix(league))
 print(recap.trophy_recap(league))
