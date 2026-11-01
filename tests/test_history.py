@@ -84,17 +84,16 @@ def test_history_report_messages():
     league = current_league([], 1)
     h = history.History(league, seasons=history_seasons(), current_weeks=0)
     msgs = history.get_history_report(league, history=h)
-    assert len(msgs) == 4 and all(len(m) < 1000 for m in msgs)
+    assert len(msgs) == 3 and all(len(m) < 1000 for m in msgs)
     assert msgs[0].startswith('📜 LEAGUE HISTORY REPORT 📜\n2 seasons (2024-2025)')
-    assert '🏆 CHAMPIONS 🏆\n2025: Curry Tamale\n2024: Ann' in msgs[0]
-    assert 'Eve' not in msgs[0] and '🚽' not in msgs[0]   # ESPN's last place is not shown
-    assert msgs[1].splitlines()[:4] == ['🤡 TRUE CLOWNS 🤡', 'Worst regular-season record (no playoffs)',
-                                        '2025: Bob 1-2', '2024: Zed 0-3']
-    assert '1. Ann 6-0 (1.000) 🏆' in msgs[2]
-    assert 'Zed' not in msgs[2]                           # all-time standings: current teams only
-    assert 'Most points: Curry Tamale 150.00 (Wk 3, 2025)' in msgs[3]
-    assert 'Fewest points: Zed 60.00 (Wk 1, 2024)' in msgs[3]
-    assert 'Closest game: Bob over Zed by 0.01 (2024)' in msgs[3]
+    # True Clown (Bob, worst record) shown, not ESPN's last place (Eve, lost the consolation game).
+    assert '2025: 🏆 Curry Tamale | 🤡 Bob\n2024: 🏆 Ann | 🤡 Zed' in msgs[0]
+    assert 'Eve' not in msgs[0]
+    assert '1. Ann 6-0 (1.000) 🏆' in msgs[1]
+    assert 'Zed' not in msgs[1]                           # all-time standings: current teams only
+    assert 'Most points: Curry Tamale 150.00 (Wk 3, 2025)' in msgs[2]
+    assert 'Fewest points: Zed 60.00 (Wk 1, 2024)' in msgs[2]
+    assert 'Closest game: Bob over Zed by 0.01 (2024)' in msgs[2]
 
 
 def test_matchup_history_and_fact():

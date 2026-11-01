@@ -311,7 +311,7 @@ def _years(years):
 def get_history_report(league, history=None):
     """
     The beginning-of-season History Report, as a list of GroupMe messages:
-    champions and last-place finishers, all-time standings, and the record book.
+    champions and True Clowns, all-time standings, and the record book.
     Returns [] when the league has no completed past seasons.
     """
     h = history or History(league, current_weeks=0)
@@ -321,33 +321,28 @@ def get_history_report(league, history=None):
     span = f'{first}' if first == last else f'{first}-{last}'
 
     champs = dict(h.champions())
-    lines = [f'📜 LEAGUE HISTORY REPORT 📜', f'{len(h.past)} seasons ({span})', '', '🏆 CHAMPIONS 🏆']
+    clowns = {y: k for y, k, *_ in h.true_clowns()}
+    lines = [f'📜 LEAGUE HISTORY REPORT 📜', f'{len(h.past)} seasons ({span})', '',
+             '🏆 Champion | 🤡 True Clown (worst reg. season)']
     for s in reversed(h.past):
         y = s['year']
-        lines.append(f'{y}: {h.name(champs[y]) if y in champs else "?"}')
-    titles = {}
+        champ = h.name(champs[y]) if y in champs else '?'
+        clown = h.name(clowns[y]) if y in clowns else '?'
+        lines.append(f'{y}: 🏆 {champ} | 🤡 {clown}')
+    titles, clown_counts = {}, {}
     for _, k in h.champions():
         titles[k] = titles.get(k, 0) + 1
-    if titles:
-        most = max(titles.values())
-        if most > 1:
-            who = ', '.join(h.name(k) for k, n in titles.items() if n == most)
-            lines += ['', f'Most titles: {who} ({most})']
-    messages = ['\n'.join(lines)]
-
-    clowns_rs = h.true_clowns()
-    if clowns_rs:
-        lines = ['🤡 TRUE CLOWNS 🤡', 'Worst regular-season record (no playoffs)']
-        for y, k, w, l, t, pts in reversed(clowns_rs):
-            lines.append(f'{y}: {h.name(k)} {_record(w, l, t)}')
-        counts = {}
-        for _, k, *_ in clowns_rs:
-            counts[k] = counts.get(k, 0) + 1
-        most = max(counts.values())
-        if most > 1:
+    for k in clowns.values():
+        clown_counts[k] = clown_counts.get(k, 0) + 1
+    extra = []
+    for label, counts in (('Most titles', titles), ('Most True Clown finishes', clown_counts)):
+        if counts and max(counts.values()) > 1:
+            most = max(counts.values())
             who = ', '.join(h.name(k) for k, n in counts.items() if n == most)
-            lines += ['', f'Most True Clown finishes: {who} ({most})']
-        messages.append('\n'.join(lines))
+            extra.append(f'{label}: {who} ({most})')
+    if extra:
+        lines += [''] + extra
+    messages = ['\n'.join(lines)]
 
     table = h.all_time()
     rows = sorted(table.items(), key=lambda kv: (-_pct(*kv[1][:3]), -kv[1][3]))
