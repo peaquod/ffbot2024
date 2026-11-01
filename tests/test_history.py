@@ -47,7 +47,7 @@ def history_seasons():
         [(1, 140, 2, 100), (3, 99, 4, 101)],
         [(1, 120, 3, 100), (2, 105, 4, 104)],
         [(1, 115, 4, 90), (2, 70, 3, 150)],
-    ], {3: 1, 1: 2, 4: 3, 2: 4}, owners_2025)
+    ], {3: 1, 1: 2, 2: 3, 4: 4}, owners_2025)   # Eve lost the consolation game; Bob had the worst record
     return [s2024, s2025]
 
 
@@ -84,14 +84,16 @@ def test_history_report_messages():
     league = current_league([], 1)
     h = history.History(league, seasons=history_seasons(), current_weeks=0)
     msgs = history.get_history_report(league, history=h)
-    assert len(msgs) == 3 and all(len(m) < 1000 for m in msgs)
+    assert len(msgs) == 4 and all(len(m) < 1000 for m in msgs)
     assert msgs[0].startswith('📜 LEAGUE HISTORY REPORT 📜\n2 seasons (2024-2025)')
-    assert '2025: 🏆 Curry Tamale | 🤡 Bob' in msgs[0]
-    assert '1. Ann 6-0 (1.000) 🏆' in msgs[1]
-    assert 'Zed' not in msgs[1]                           # all-time standings: current teams only
-    assert 'Most points: Curry Tamale 150.00 (Wk 3, 2025)' in msgs[2]
-    assert 'Fewest points: Zed 60.00 (Wk 1, 2024)' in msgs[2]
-    assert 'Closest game: Bob over Zed by 0.01 (2024)' in msgs[2]
+    assert '2025: 🏆 Curry Tamale | 🚽 Eve' in msgs[0]
+    assert msgs[1].splitlines()[:4] == ['🤡 TRUE CLOWNS 🤡', 'Worst regular-season record (no playoffs)',
+                                        '2025: Bob 1-2', '2024: Zed 0-3']
+    assert '1. Ann 6-0 (1.000) 🏆' in msgs[2]
+    assert 'Zed' not in msgs[2]                           # all-time standings: current teams only
+    assert 'Most points: Curry Tamale 150.00 (Wk 3, 2025)' in msgs[3]
+    assert 'Fewest points: Zed 60.00 (Wk 1, 2024)' in msgs[3]
+    assert 'Closest game: Bob over Zed by 0.01 (2024)' in msgs[3]
 
 
 def test_matchup_history_and_fact():
@@ -145,3 +147,16 @@ def test_saved_history_file_loads():
         for s in seasons:
             reg = [g for g in s['games'] if g['week'] <= s['reg_season_count']]
             assert len(reg) * 2 == sum(t['wins'] + t['losses'] + t['ties'] for t in s['teams'])
+
+
+def test_true_clown_ignores_playoffs():
+    seasons = history_seasons()
+    # A consolation game in week 4 (after the 3-week regular season) that Bob wins big.
+    seasons[1]['games'].append({'week': 4, 'home': 2, 'away': 4, 'home_score': 200, 'away_score': 50})
+    league = current_league([], 1)
+    h = history.History(league, seasons=seasons, current_weeks=0)
+    clowns = {y: (h.name(k), w, l) for y, k, w, l, t, pts in h.true_clowns()}
+    assert clowns == {2024: ('Zed', 0, 3), 2025: ('Bob', 1, 2)}     # 1-2 three ways; Bob has fewest points
+    facts = history.random_facts(h)
+    assert 'Bob was the 2025 True Clown, with the worst regular season. 🤡' in facts
+    assert not any('Eve' in f and 'Clown' in f for f in facts)

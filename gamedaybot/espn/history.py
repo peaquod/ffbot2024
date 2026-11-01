@@ -200,6 +200,30 @@ class History:
                 out.append((s['year'], self.who.key(worst)))
         return out
 
+    def true_clowns(self):
+        """
+        The worst regular-season team of each past season, ignoring playoff and consolation
+        games: [(year, key, wins, losses, ties, points)]. Fewest points breaks ties.
+        """
+        out = []
+        for s in self.past:
+            keys = {t['id']: self.who.key(t) for t in s['teams']}
+            rec = {k: [0, 0, 0, 0.0] for k in keys.values()}
+            for g in s['games']:
+                if g['week'] > s['reg_season_count'] or g['home'] not in keys or g['away'] not in keys:
+                    continue
+                for k, mine, theirs in ((keys[g['home']], g['home_score'], g['away_score']),
+                                        (keys[g['away']], g['away_score'], g['home_score'])):
+                    rec[k][0] += mine > theirs
+                    rec[k][1] += mine < theirs
+                    rec[k][2] += mine == theirs
+                    rec[k][3] += mine
+            played = {k: v for k, v in rec.items() if sum(v[:3])}
+            if played:
+                k, (w, l, t, pts) = min(played.items(), key=lambda kv: (_pct(*kv[1][:3]), kv[1][3]))
+                out.append((s['year'], k, w, l, t, round(pts, 2)))
+        return out
+
     def season_records(self):
         """[(year, key, wins, losses, ties, points)] for every past season."""
         out = []
@@ -298,12 +322,13 @@ def get_history_report(league, history=None):
 
     champs = dict(h.champions())
     clowns = dict(h.last_places())
-    lines = [f'📜 LEAGUE HISTORY REPORT 📜', f'{len(h.past)} seasons ({span})', '', '🏆 Champion | 🤡 Last place']
+    lines = [f'📜 LEAGUE HISTORY REPORT 📜', f'{len(h.past)} seasons ({span})', '',
+             '🏆 Champion | 🚽 Last in final standings']
     for s in reversed(h.past):
         y = s['year']
         champ = h.name(champs[y]) if y in champs else '?'
         clown = h.name(clowns[y]) if y in clowns else '?'
-        lines.append(f'{y}: 🏆 {champ} | 🤡 {clown}')
+        lines.append(f'{y}: 🏆 {champ} | 🚽 {clown}')
     titles = {}
     for _, k in h.champions():
         titles[k] = titles.get(k, 0) + 1
@@ -313,6 +338,20 @@ def get_history_report(league, history=None):
             who = ', '.join(h.name(k) for k, n in titles.items() if n == most)
             lines += ['', f'Most titles: {who} ({most})']
     messages = ['\n'.join(lines)]
+
+    clowns_rs = h.true_clowns()
+    if clowns_rs:
+        lines = ['🤡 TRUE CLOWNS 🤡', 'Worst regular-season record (no playoffs)']
+        for y, k, w, l, t, pts in reversed(clowns_rs):
+            lines.append(f'{y}: {h.name(k)} {_record(w, l, t)}')
+        counts = {}
+        for _, k, *_ in clowns_rs:
+            counts[k] = counts.get(k, 0) + 1
+        most = max(counts.values())
+        if most > 1:
+            who = ', '.join(h.name(k) for k, n in counts.items() if n == most)
+            lines += ['', f'Most True Clown finishes: {who} ({most})']
+        messages.append('\n'.join(lines))
 
     table = h.all_time()
     rows = sorted(table.items(), key=lambda kv: (-_pct(*kv[1][:3]), -kv[1][3]))
@@ -370,7 +409,7 @@ def random_facts(h):
     titles, last = {}, {}
     for y, k in h.champions():
         titles.setdefault(k, []).append(y)
-    for y, k in h.last_places():
+    for y, k, *_ in h.true_clowns():
         last.setdefault(k, []).append(y)
     current_keys = {h.team_key(t) for t in h.league.teams}
 
@@ -381,9 +420,10 @@ def random_facts(h):
             facts.append(f'{h.name(k)} won the {years[0]} championship.')
     for k, years in last.items():
         if len(years) > 1:
-            facts.append(f'{h.name(k)} has finished last {len(years)} times ({_years(years)}). 🤡')
+            facts.append(f'{h.name(k)} has been the True Clown {len(years)} times, with the worst '
+                         f'regular season in {_years(years)}. 🤡')
         else:
-            facts.append(f'{h.name(k)} finished dead last in {years[0]}. 🤡')
+            facts.append(f'{h.name(k)} was the {years[0]} True Clown, with the worst regular season. 🤡')
     droughts = [k for k in current_keys if k not in titles]
     if droughts and titles:
         facts.append(f'Still chasing a first title: {", ".join(sorted(h.name(k) for k in droughts))}.')
