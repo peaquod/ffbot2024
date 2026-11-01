@@ -1,0 +1,52 @@
+name: Build league history
+
+# Downloads every completed past season of the league from ESPN and saves it to
+# data/league_history.json, which the History Report, the Thursday all-time series and
+# record alerts read from. Past seasons never change, so this only needs to run once a year,
+# before the season starts (it also runs on its own every August). Run it by hand from the
+# Actions tab any time.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 15 20 8 *'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BOT_ID: ${{ secrets.BOT_ID }}
+      LEAGUE_ID: ${{ secrets.LEAGUE_ID }}
+      SWID: ${{ secrets.SWID }}
+      ESPN_S2: ${{ secrets.ESPN_S2 }}
+      LEAGUE_YEAR: ${{ vars.LEAGUE_YEAR }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download past seasons
+        run: python -m gamedaybot.espn.history --build data/league_history.json
+
+      - name: Save to the repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/league_history.json
+          if git diff --cached --quiet; then
+            echo "History unchanged"
+          else
+            git commit -m "Update league history"
+            git push
+          fi
