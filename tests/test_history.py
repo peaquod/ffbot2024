@@ -160,3 +160,20 @@ def test_true_clown_ignores_playoffs():
     facts = history.random_facts(h)
     assert 'Bob was the 2025 True Clown, with the worst regular season. 🤡' in facts
     assert not any('Eve' in f and 'Clown' in f for f in facts)
+
+
+def test_asterisk_season(monkeypatch):
+    monkeypatch.setattr(history, 'ASTERISK_SEASONS', {2024: "2024 doesn't really count."})
+    league = current_league([], 1)
+    h = history.History(league, seasons=history_seasons(), current_weeks=0)
+    msgs = history.get_history_report(league, history=h)
+    assert '2 seasons (2024*-2025)' in msgs[0]
+    assert '2024*: 🏆 Ann | 🤡 Zed' in msgs[0]
+    assert '2025: 🏆 Curry Tamale' in msgs[0]
+    assert msgs[0].endswith("\n\n*2024 doesn't really count.")
+    assert '1. Ann 6-0 (1.000) 🏆*' in msgs[1]                # Ann's only title is 2024
+    assert 'Fewest points: Zed 60.00 (Wk 1, 2024*)' in msgs[2]
+    assert msgs[2].endswith("*2024 doesn't really count.")
+    fact = history._footnote('Ann won the 2024* championship.', short=True)
+    assert fact == "Ann won the 2024* championship. (*2024 doesn't really count.)"
+    assert history._footnote('Nothing old here, 2025.') == 'Nothing old here, 2025.'

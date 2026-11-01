@@ -22,6 +22,11 @@ else:
     sys.path.insert(1, os.path.abspath('.'))
     import gamedaybot.utils.util as util
 
+# Seasons shown with an asterisk, and the footnote explaining it.
+ASTERISK_SEASONS = {
+    2011: "2011 was the pre-modern version of the league. It doesn't really count, but it's in here anyway.",
+}
+
 HISTORY_FILE = os.environ.get('HISTORY_FILE') or os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     'data', 'league_history.json')
@@ -301,9 +306,23 @@ def _pct(w, l, t=0):
     return (w + 0.5 * t) / games if games else 0
 
 
+def _y(year):
+    """A season year, with an asterisk if it's in ASTERISK_SEASONS."""
+    return f'{year}*' if year in ASTERISK_SEASONS else str(year)
+
+
 def _years(years):
-    years = sorted(years)
-    return ', '.join(str(y) for y in years)
+    return ', '.join(_y(y) for y in sorted(years))
+
+
+def _footnote(text, short=False):
+    """Adds the asterisk footnote(s) for any asterisked season mentioned in the text."""
+    notes = [note for year, note in ASTERISK_SEASONS.items() if f'{year}*' in text]
+    if not notes:
+        return text
+    if short:
+        return text + ' (*' + ' '.join(notes) + ')'
+    return text + '\n\n' + '\n'.join('*' + n for n in notes)
 
 
 # ---------------------------------------------------------------- 1. History Report
@@ -318,7 +337,7 @@ def get_history_report(league, history=None):
     if not h.has_history:
         return []
     first, last = h.past[0]['year'], h.past[-1]['year']
-    span = f'{first}' if first == last else f'{first}-{last}'
+    span = _y(first) if first == last else f'{_y(first)}-{_y(last)}'
 
     champs = dict(h.champions())
     clowns = {y: k for y, k, *_ in h.true_clowns()}
@@ -328,7 +347,7 @@ def get_history_report(league, history=None):
         y = s['year']
         champ = h.name(champs[y]) if y in champs else '?'
         clown = h.name(clowns[y]) if y in clowns else '?'
-        lines.append(f'{y}: 🏆 {champ} | 🤡 {clown}')
+        lines.append(f'{_y(y)}: 🏆 {champ} | 🤡 {clown}')
     titles, clown_counts = {}, {}
     for _, k in h.champions():
         titles[k] = titles.get(k, 0) + 1
@@ -342,7 +361,7 @@ def get_history_report(league, history=None):
             extra.append(f'{label}: {who} ({most})')
     if extra:
         lines += [''] + extra
-    messages = ['\n'.join(lines)]
+    messages = [_footnote('\n'.join(lines))]
 
     table = h.all_time()
     rows = sorted(table.items(), key=lambda kv: (-_pct(*kv[1][:3]), -kv[1][3]))
@@ -350,7 +369,12 @@ def get_history_report(league, history=None):
     lines = ['📊 All-Time Standings (reg. season)']
     for pos, (k, (w, l, t, pts, n)) in enumerate([r for r in rows if r[0] in current_keys], start=1):
         ring = (' ' + '🏆' * titles[k]) if titles.get(k) else ''
+        if any(y in ASTERISK_SEASONS for y, champ in h.champions() if champ == k):
+            ring += '*'
         lines.append(f'{pos}. {h.name(k)} {_record(w, l, t)} ({_pct(w, l, t):.3f}){ring}')
+    if any(line.endswith('*') for line in lines):
+        lines += ['', '*Includes a ' + '/'.join(str(y) for y in ASTERISK_SEASONS) + ' title. '
+                  + ' '.join(ASTERISK_SEASONS.values())]
     messages.append('\n'.join(lines))
 
     messages.append(record_book(h))
@@ -363,15 +387,15 @@ def record_book(h):
     if scores:
         hi = max(scores)
         lo = min(scores)
-        lines.append(f'Most points: {h.name(hi[1])} {hi[0]:.2f} (Wk {hi[5]}, {hi[4]})')
-        lines.append(f'Fewest points: {h.name(lo[1])} {lo[0]:.2f} (Wk {lo[5]}, {lo[4]})')
+        lines.append(f'Most points: {h.name(hi[1])} {hi[0]:.2f} (Wk {hi[5]}, {_y(hi[4])})')
+        lines.append(f'Fewest points: {h.name(lo[1])} {lo[0]:.2f} (Wk {lo[5]}, {_y(lo[4])})')
         blow = max(scores, key=lambda r: r[0] - r[3])
         lines.append(f'Biggest blowout: {h.name(blow[1])} over {h.name(blow[2])} by {blow[0] - blow[3]:.2f} '
-                     f'({blow[4]})')
+                     f'({_y(blow[4])})')
         close = min((r for r in scores if r[0] > r[3]), key=lambda r: r[0] - r[3], default=None)
         if close:
             lines.append(f'Closest game: {h.name(close[1])} over {h.name(close[2])} by {close[0] - close[3]:.2f} '
-                         f'({close[4]})')
+                         f'({_y(close[4])})')
     best_w, best_l, _ = h.streaks()
     if best_w:
         k, (n, start, end) = max(best_w.items(), key=lambda kv: kv[1][0])
@@ -383,13 +407,13 @@ def record_book(h):
     if seasons:
         best = max(seasons, key=lambda r: (_pct(r[2], r[3], r[4]), r[5]))
         worst = min(seasons, key=lambda r: (_pct(r[2], r[3], r[4]), r[5]))
-        lines.append(f'Best season: {h.name(best[1])} {_record(*best[2:5])} ({best[0]})')
-        lines.append(f'Worst season: {h.name(worst[1])} {_record(*worst[2:5])} ({worst[0]})')
-    return '\n'.join(lines)
+        lines.append(f'Best season: {h.name(best[1])} {_record(*best[2:5])} ({_y(best[0])})')
+        lines.append(f'Worst season: {h.name(worst[1])} {_record(*worst[2:5])} ({_y(worst[0])})')
+    return _footnote('\n'.join(lines))
 
 
 def _span(start, end):
-    return str(start[0]) if start[0] == end[0] else f'{start[0]}-{end[0]}'
+    return _y(start[0]) if start[0] == end[0] else f'{_y(start[0])}-{_y(end[0])}'
 
 
 # ---------------------------------------------------------------- 2. Thursday history
@@ -408,13 +432,13 @@ def random_facts(h):
         if len(years) > 1:
             facts.append(f'{h.name(k)} has won {len(years)} titles ({_years(years)}).')
         else:
-            facts.append(f'{h.name(k)} won the {years[0]} championship.')
+            facts.append(f'{h.name(k)} won the {_y(years[0])} championship.')
     for k, years in last.items():
         if len(years) > 1:
             facts.append(f'{h.name(k)} has been the True Clown {len(years)} times, with the worst '
                          f'regular season in {_years(years)}. 🤡')
         else:
-            facts.append(f'{h.name(k)} was the {years[0]} True Clown, with the worst regular season. 🤡')
+            facts.append(f'{h.name(k)} was the {_y(years[0])} True Clown, with the worst regular season. 🤡')
     droughts = [k for k in current_keys if k not in titles]
     if droughts and titles:
         facts.append(f'Still chasing a first title: {", ".join(sorted(h.name(k) for k in droughts))}.')
@@ -422,16 +446,16 @@ def random_facts(h):
     scores = h.team_scores()
     if scores:
         hi, lo = max(scores), min(scores)
-        facts.append(f'The highest score in league history is {hi[0]:.2f}, by {h.name(hi[1])} in Week {hi[5]}, {hi[4]}.')
-        facts.append(f'The lowest score in league history is {lo[0]:.2f}, by {h.name(lo[1])} in Week {lo[5]}, {lo[4]}.')
+        facts.append(f'The highest score in league history is {hi[0]:.2f}, by {h.name(hi[1])} in Week {hi[5]}, {_y(hi[4])}.')
+        facts.append(f'The lowest score in league history is {lo[0]:.2f}, by {h.name(lo[1])} in Week {lo[5]}, {_y(lo[4])}.')
         hi_loss = max((r for r in scores if r[0] < r[3]), default=None)
         if hi_loss:
             facts.append(f'Most points in a loss: {h.name(hi_loss[1])} scored {hi_loss[0]:.2f} and still lost to '
-                         f'{h.name(hi_loss[2])} ({hi_loss[4]}).')
+                         f'{h.name(hi_loss[2])} ({_y(hi_loss[4])}).')
         lo_win = min((r for r in scores if r[0] > r[3]), default=None)
         if lo_win:
             facts.append(f'Fewest points in a win: {h.name(lo_win[1])} won with just {lo_win[0]:.2f} '
-                         f'against {h.name(lo_win[2])} ({lo_win[4]}).')
+                         f'against {h.name(lo_win[2])} ({_y(lo_win[4])}).')
 
     table = h.all_time()
     mine = {k: v for k, v in table.items() if k in current_keys and v[4] >= 10}
@@ -454,9 +478,9 @@ def random_facts(h):
     seasons = h.season_records()
     if seasons:
         best = max(seasons, key=lambda r: (_pct(r[2], r[3], r[4]), r[5]))
-        facts.append(f'Best regular season ever: {h.name(best[1])} went {_record(*best[2:5])} in {best[0]}.')
+        facts.append(f'Best regular season ever: {h.name(best[1])} went {_record(*best[2:5])} in {_y(best[0])}.')
         top_pts = max(seasons, key=lambda r: r[5])
-        facts.append(f'Most points in a season: {h.name(top_pts[1])} with {top_pts[5]:,.1f} in {top_pts[0]}.')
+        facts.append(f'Most points in a season: {h.name(top_pts[1])} with {top_pts[5]:,.1f} in {_y(top_pts[0])}.')
 
     # Lopsided rivalries among current teams.
     current = [h.team_key(t) for t in h.league.teams]
@@ -471,7 +495,7 @@ def random_facts(h):
 
 def pick_fact(h, seed):
     facts = random_facts(h)
-    return random.Random(seed).choice(facts) if facts else ''
+    return _footnote(random.Random(seed).choice(facts), short=True) if facts else ''
 
 
 def get_matchup_history(league, week=None, history=None):
