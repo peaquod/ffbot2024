@@ -86,7 +86,8 @@ def test_history_report_messages():
     msgs = history.get_history_report(league, history=h)
     assert len(msgs) == 4 and all(len(m) < 1000 for m in msgs)
     assert msgs[0].startswith('📜 LEAGUE HISTORY REPORT 📜\n2 seasons (2024-2025)')
-    assert '2025: 🏆 Curry Tamale | 🚽 Eve' in msgs[0]
+    assert '🏆 CHAMPIONS 🏆\n2025: Curry Tamale\n2024: Ann' in msgs[0]
+    assert 'Eve' not in msgs[0] and '🚽' not in msgs[0]   # ESPN's last place is not shown
     assert msgs[1].splitlines()[:4] == ['🤡 TRUE CLOWNS 🤡', 'Worst regular-season record (no playoffs)',
                                         '2025: Bob 1-2', '2024: Zed 0-3']
     assert '1. Ann 6-0 (1.000) 🏆' in msgs[2]

@@ -321,14 +321,10 @@ def get_history_report(league, history=None):
     span = f'{first}' if first == last else f'{first}-{last}'
 
     champs = dict(h.champions())
-    clowns = dict(h.last_places())
-    lines = [f'📜 LEAGUE HISTORY REPORT 📜', f'{len(h.past)} seasons ({span})', '',
-             '🏆 Champion | 🚽 Last in final standings']
+    lines = [f'📜 LEAGUE HISTORY REPORT 📜', f'{len(h.past)} seasons ({span})', '', '🏆 CHAMPIONS 🏆']
     for s in reversed(h.past):
         y = s['year']
-        champ = h.name(champs[y]) if y in champs else '?'
-        clown = h.name(clowns[y]) if y in clowns else '?'
-        lines.append(f'{y}: 🏆 {champ} | 🚽 {clown}')
+        lines.append(f'{y}: {h.name(champs[y]) if y in champs else "?"}')
     titles = {}
     for _, k in h.champions():
         titles[k] = titles.get(k, 0) + 1
